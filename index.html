@@ -193,6 +193,17 @@
   button.b:disabled { opacity: .45; cursor: default; }
   .flashbox { background: #1e2a22; border: 1px solid #3c6b4a; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
   .flashbox .out-btns { margin-bottom: 4px; }
+  .usbflash { background: #1b2230; border: 1px solid #36507a; border-radius: 8px; padding: 6px 12px 10px; }
+  .usbflash.drop { border-color: var(--accent); box-shadow: 0 0 0 2px #7c6cf055; }
+  .usbflash .steps-list { margin: 6px 0 0; padding-left: 20px; }
+  .usbflash .steps-list li { margin: 6px 0; font-size: 13px; line-height: 1.6; }
+  .usbprog { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .usbprog .bar { flex: 1; height: 10px; background: #0f1114; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+  .usbprog .bar div { height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+  .usbprog span { font-size: 12px; color: var(--sub); white-space: nowrap; min-width: 9em; }
+  .usblog { margin: 8px 0 0; max-height: 160px; font-size: 12px; white-space: pre-wrap; }
+  .usblog .ok { color: #8fe3a5; } .usblog .ng { color: var(--err); }
+  .warn-text { color: var(--warn); }
   .undobar { position: fixed; right: 18px; bottom: 18px; z-index: 50; display: flex; gap: 6px;
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px; box-shadow: 0 4px 16px #0008; }
   .undobar button { white-space: nowrap; }
@@ -217,6 +228,7 @@
     <a href="#cardMacro">マクロ（M16〜）</a>
     <a href="#cardOut">保存</a>
     <a href="#cardBuild">ビルドと書き込み</a>
+    <a href="#flashTool">書き込む</a>
   </nav>
 </header>
 <div class="undobar">
@@ -423,7 +435,29 @@
         <button class="b" id="btnGhUpload">2. アップロード画面を開く</button>
         <button class="b" id="btnGhActions">3. ビルドの様子（Actions）を開く</button>
       </div>
-      <p class="hint" id="ghMsg">2 の画面に、1 で保存した keymap.c をドラッグして「Commit changes」。3 で緑のチェックになったら、その行を開いて「Artifacts」から .bin をダウンロードし、QMK Toolbox か Launcher で書き込みます。</p>
+      <p class="hint" id="ghMsg">2 の画面に、1 で保存した keymap.c をドラッグして「Commit changes」。3 で緑のチェックになったら、その行を開いて「Artifacts」から zip をダウンロードし、下の「このツールで書き込む」で書き込みます（zip のままで大丈夫）。</p>
+
+      <h3 id="flashTool">このツールで書き込む（.bin / zip）</h3>
+      <div class="usbflash">
+        <p class="hint" id="usbUnsupported" style="display:none"><b>このブラウザでは使えません。</b>Chrome か Edge で開いてください（USB の機器と直接やり取りする機能を使います）。</p>
+        <ol class="steps-list">
+          <li><b>焼く前に</b>：Launcherで「エクスポート」しておく（焼くと Launcher のマクロ M0〜M15 とキー割り当ては消えます）。<b>Launcher のページは閉じる</b>（開いていると USB の取り合いになります）。</li>
+          <li><b>ファームを選ぶ</b>：GitHub の Artifacts の zip か、.bin（自分のパソコンでビルドしたときは <code>C:\qmk_keychron_2025q3\keychron_q0_max_encoder_layer_color.bin</code>）。
+            <div class="out-btns" style="margin-top:6px">
+              <input type="file" id="fwFile" accept=".bin,.zip" style="display:none">
+              <button class="b" id="btnFwPick">ファイルを選ぶ</button>
+              <span class="hint" id="fwInfo" style="margin:0">まだ選んでいません（ここにドラッグしても選べます）</span>
+            </div></li>
+          <li><b>書き込みモードにする</b>：背面スイッチを真ん中（Cable）にして、<b>0 のキーキャップ下のリセットボタンを押したまま USB を挿す</b>（ライトが消えたままなら成功）。キーに <b>QK_BOOT（書込モードへ）</b>を置いてあれば、挿したままそのキーを押すだけでもOK。</li>
+          <li><b>書き込む</b>：下のボタン → 出てきた一覧で <b>STM32 BOOTLOADER</b> を選んで「接続」。終わるとキーボードが自動で再起動します。
+            <div class="out-btns" style="margin-top:6px">
+              <button class="b primary" id="btnUsbFlash" disabled>キーボードを選んで書き込む</button>
+            </div>
+            <div class="usbprog" id="usbProg" style="display:none"><div class="bar"><div id="usbBar"></div></div><span id="usbStep"></span></div>
+            <pre class="usblog" id="usbLog" style="display:none"></pre></li>
+          <li><b>焼いた後に</b>：Launcherで「インポート」して戻す → USB を抜いて10秒後に挿し直し、設定が残っているか確認。</li>
+        </ol>
+      </div>
       <p class="hint">純正に戻すとき：Launcherの「ファームウェアアップデート」→ リセットボタンを押したまま挿す →「デバイスをマッチ」で「STM32 BOOTLOADER」を選ぶ →「Flash Firmware」。</p>
     </div>
   </div>
@@ -1597,6 +1631,286 @@ function renderSaves(selName) {
 
 /* ===== ボタン ===== */
 function flash(msg) { $("status").textContent = msg; clearTimeout(flash.t); flash.t = setTimeout(() => $("status").textContent = "", 4000); }
+
+/* ===== このツールで書き込む（WebUSB で STM32 の書き込みモード＝DfuSe と話す） =====
+   qmk flash（中身は dfu-util -a 0 -d 0483:DF11 -s 0x08000000:leave -D ファーム.bin）と同じことをする：
+   ファームが入る範囲のセクタだけ消去 → 0x08000000 から書き込み → 読み戻して照合 → 再起動 */
+const DFU = { DNLOAD: 1, UPLOAD: 2, GETSTATUS: 3, CLRSTATUS: 4, GETSTATE: 5, ABORT: 6 };
+const DFU_ST = { IDLE: 2, DNBUSY: 4, DNLOAD_IDLE: 5, MANIFEST_SYNC: 6, MANIFEST: 7, UPLOAD_IDLE: 9, ERROR: 10 };
+const FLASH_BASE = 0x08000000;
+const STM32_DFU = { vendorId: 0x0483, productId: 0xDF11 };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// "@Internal Flash  /0x08000000/04*016Kg,01*064Kg,03*128Kg" → セクタの一覧
+function parseDfuseLayout(name) {
+  const m = /\/\s*0x([0-9a-fA-F]+)\s*\/([^/]+)/.exec(name || "");
+  if (!m) return null;
+  const start = parseInt(m[1], 16);
+  let addr = start; const sectors = [];
+  for (const part of m[2].split(",")) {
+    const p = /^\s*(\d+)\s*\*\s*(\d+)\s*([BKM ]?)\s*([a-g])?/i.exec(part);
+    if (!p) return null;
+    const size = +p[2] * ({ K: 1024, M: 1048576 }[(p[3] || "").toUpperCase()] || 1);
+    const t = (p[4] || "g").toLowerCase();
+    for (let i = 0; i < +p[1]; i++) { sectors.push({ addr, size, erasable: "bcfg".includes(t), writable: "defg".includes(t) }); addr += size; }
+  }
+  return { start, end: addr, sectors };
+}
+// 選んだファイルが STM32 のファームらしいか（最初の2語＝スタックの位置と起動の番地）
+function checkFirmware(u8) {
+  if (!u8 || u8.length < 1024) return "ファイルが小さすぎます（ファームではないようです）。";
+  if (u8.length > 1024 * 1024) return "ファイルが大きすぎます（ファームではないようです）。";
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  const sp = dv.getUint32(0, true), rv = dv.getUint32(4, true);
+  if (sp < 0x20000000 || sp > 0x20040000) return "このファイルは STM32 のファームの形ではありません（.bin ではなく .hex や別のファイルかもしれません）。";
+  if (rv < FLASH_BASE || rv >= FLASH_BASE + 0x100000 || !(rv & 1)) return "このファイルは 0x08000000 から書き込むファームの形ではありません。";
+  return null;
+}
+// GitHub の Artifacts（zip）から .bin を取り出す
+async function unzipFirstBin(u8) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  let e = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error("zip の形が読めません。");
+  const n = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+  const list = [];
+  for (let k = 0; k < n; k++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error("zip の形が読めません。");
+    const nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true);
+    list.push({ method: dv.getUint16(p + 10, true), csize: dv.getUint32(p + 20, true), usize: dv.getUint32(p + 24, true),
+      off: dv.getUint32(p + 42, true), name: new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen)) });
+    p += 46 + nlen + xlen + clen;
+  }
+  const bins = list.filter(x => /\.bin$/i.test(x.name));
+  if (!bins.length) throw new Error("zip の中に .bin がありません。");
+  const x = bins[0], lo = x.off;
+  if (dv.getUint32(lo, true) !== 0x04034b50) throw new Error("zip の形が読めません。");
+  const ds = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true);
+  const comp = u8.subarray(ds, ds + x.csize);
+  let data;
+  if (x.method === 0) data = comp.slice();
+  else if (x.method === 8) {
+    if (typeof DecompressionStream === "undefined") throw new Error("このブラウザは zip を開けません。zip を展開して中の .bin を選んでください。");
+    const s = new Blob([comp]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    data = new Uint8Array(await new Response(s).arrayBuffer());
+  } else throw new Error(`この zip の圧縮方式（${x.method}）には対応していません。展開して中の .bin を選んでください。`);
+  if (data.length !== x.usize) throw new Error("zip の展開に失敗しました。");
+  return { name: x.name.split("/").pop(), data, others: bins.length - 1 };
+}
+async function readFirmwareFile(file) {
+  const u8 = new Uint8Array(await file.arrayBuffer());
+  if (u8.length >= 4 && u8[0] === 0x50 && u8[1] === 0x4b) { const z = await unzipFirstBin(u8); return { name: `${file.name} の中の ${z.name}`, data: z.data, others: z.others }; }
+  return { name: file.name, data: u8, others: 0 };
+}
+
+class DfuSe {
+  constructor(dev, log) { this.dev = dev; this.log = log || (() => {}); this.xfer = 2048; this.intf = 0; this.layout = null; this.name = ""; }
+  ctl(dir, req, value, dataOrLen) {
+    const setup = { requestType: "class", recipient: "interface", request: req, value, index: this.intf };
+    return dir === "out" ? this.dev.controlTransferOut(setup, dataOrLen) : this.dev.controlTransferIn(setup, dataOrLen);
+  }
+  async readDesc(value, index, len) {
+    const r = await this.dev.controlTransferIn({ requestType: "standard", recipient: "device", request: 6, value, index }, len);
+    if (r.status !== "ok") throw new Error("USB の読み取りに失敗しました");
+    return new Uint8Array(r.data.buffer, r.data.byteOffset, r.data.byteLength);
+  }
+  async readString(idx) {
+    if (!idx) return "";
+    const d = await this.readDesc(0x0300 | idx, 0x0409, 255);
+    let s = ""; for (let i = 2; i + 1 < Math.min(d[0], d.length); i += 2) s += String.fromCharCode(d[i] | (d[i + 1] << 8));
+    return s;
+  }
+  async open() {
+    const dev = this.dev;
+    await dev.open();
+    if (dev.configuration === null) await dev.selectConfiguration(1);
+    // 構成の記述子から、1回に送れる大きさ（wTransferSize）と、メモリ配置の文字列の番号を読む
+    const strIdx = {};
+    try {
+      const h = await this.readDesc(0x0200, 0, 9);
+      const total = h[2] | (h[3] << 8);
+      const d = await this.readDesc(0x0200, 0, total);
+      let cur = null;
+      for (let o = 0; o + 1 < d.length && d[o] > 0; o += d[o]) {
+        if (d[o + 1] === 4) { cur = { num: d[o + 2], alt: d[o + 3] }; if (d[o + 5] === 0xFE && d[o + 6] === 1) strIdx[cur.num + ":" + cur.alt] = d[o + 8]; }
+        if (d[o + 1] === 0x21 && d[o] >= 7) { const t = d[o + 5] | (d[o + 6] << 8); if (t >= 64 && t <= 4096) this.xfer = t; }
+      }
+    } catch (e) { this.log("（USB の記述子は読めなかったので、標準の値で進めます）"); }
+    const cands = [];
+    for (const itf of dev.configuration.interfaces)
+      for (const a of itf.alternates)
+        if (a.interfaceClass === 0xFE && a.interfaceSubclass === 1) cands.push({ num: itf.interfaceNumber, alt: a.alternateSetting, name: a.interfaceName || "" });
+    if (!cands.length) throw new Error("このデバイスには書き込みモード（DFU）の窓口がありません。");
+    for (const c of cands) if (!c.name) { try { c.name = await this.readString(strIdx[c.num + ":" + c.alt]); } catch (e) {} }
+    const c = cands.find(c => /Internal Flash/i.test(c.name)) || cands.find(c => c.alt === 0) || cands[0];
+    this.intf = c.num; this.name = c.name;
+    await dev.claimInterface(c.num);
+    await dev.selectAlternateInterface(c.num, c.alt);
+    this.layout = parseDfuseLayout(c.name);
+    this.log(`接続：${dev.productName || "STM32 BOOTLOADER"}／${c.name || "（配置の情報なし）"}／1回 ${this.xfer} バイト`);
+  }
+  async getStatus() {
+    const r = await this.ctl("in", DFU.GETSTATUS, 0, 6);
+    if (r.status !== "ok") throw new Error("状態を読めませんでした");
+    const d = r.data;
+    return { status: d.getUint8(0), poll: d.getUint8(1) | (d.getUint8(2) << 8) | (d.getUint8(3) << 16), state: d.getUint8(4) };
+  }
+  async getState() { const r = await this.ctl("in", DFU.GETSTATE, 0, 1); return r.data.getUint8(0); }
+  async toIdle() {
+    let st = await this.getState();
+    if (st === DFU_ST.ERROR) { await this.ctl("out", DFU.CLRSTATUS, 0); st = await this.getState(); }
+    if (st !== DFU_ST.IDLE) { await this.ctl("out", DFU.ABORT, 0); st = await this.getState(); }
+    if (st !== DFU_ST.IDLE) throw new Error(`書き込みモードの準備ができません（状態 ${st}）`);
+  }
+  async waitIdle(what) {
+    for (let i = 0; i < 3000; i++) {
+      const s = await this.getStatus();
+      if (s.status !== 0 || s.state === DFU_ST.ERROR) {
+        try { await this.ctl("out", DFU.CLRSTATUS, 0); } catch (e) {}
+        throw new Error(`${what}でキーボードがエラーを返しました（コード ${s.status}）`);
+      }
+      if (s.state === DFU_ST.DNBUSY) { await sleep(Math.max(1, s.poll)); continue; }
+      return s;
+    }
+    throw new Error(`${what}が終わりません`);
+  }
+  async cmd(code, addr, what) {
+    const b = new Uint8Array([code, addr & 0xff, (addr >>> 8) & 0xff, (addr >>> 16) & 0xff, (addr >>> 24) & 0xff]);
+    const r = await this.ctl("out", DFU.DNLOAD, 0, b);
+    if (r.status !== "ok") throw new Error(`${what}の命令を送れませんでした`);
+    await this.waitIdle(what);
+  }
+  // 書き込む範囲にかかるセクタ（配置が分からないときは 16KB ごとに消す＝そのセクタ全体が消える）
+  eraseList(start, len) {
+    if (this.layout) return this.layout.sectors.filter(s => s.erasable && s.addr < start + len && s.addr + s.size > start).map(s => s.addr);
+    const out = []; for (let a = start; a < start + len; a += 16384) out.push(a); return out;
+  }
+  async flash(data, progress) {
+    const start = FLASH_BASE, len = data.length;
+    const P = progress || (() => {});
+    if (this.layout) {
+      if (this.layout.start !== start) throw new Error(`書き込み先の番地が想定（0x08000000）と違います：0x${this.layout.start.toString(16)}`);
+      if (start + len > this.layout.end) throw new Error(`ファームが大きすぎます（${len} バイト／書ける大きさ ${this.layout.end - start} バイト）`);
+    }
+    await this.toIdle();
+    const er = this.eraseList(start, len);
+    for (let i = 0; i < er.length; i++) { P("消去", i, er.length); await this.cmd(0x41, er[i], "消去"); }
+    P("消去", er.length, er.length);
+    const n = Math.ceil(len / this.xfer);
+    for (let i = 0; i < n; i++) {
+      P("書き込み", i, n);
+      const off = i * this.xfer, chunk = data.subarray(off, Math.min(len, off + this.xfer));
+      await this.cmd(0x21, start + off, "番地の指定");
+      const r = await this.ctl("out", DFU.DNLOAD, 2, chunk);
+      if (r.status !== "ok") throw new Error("書き込みのデータを送れませんでした");
+      await this.waitIdle("書き込み");
+    }
+    P("書き込み", n, n);
+  }
+  // 読み戻して照合。true=一致、false=不一致、null=読み戻しができなかった
+  async verify(data, progress) {
+    const P = progress || (() => {});
+    try {
+      await this.toIdle();
+      await this.cmd(0x21, FLASH_BASE, "番地の指定");
+      await this.toIdle();
+      const n = Math.ceil(data.length / this.xfer);
+      for (let i = 0; i < n; i++) {
+        P("照合", i, n);
+        const want = Math.min(this.xfer, data.length - i * this.xfer);
+        const r = await this.ctl("in", DFU.UPLOAD, 2 + i, this.xfer);
+        if (r.status !== "ok" || r.data.byteLength < want) return null;
+        const got = new Uint8Array(r.data.buffer, r.data.byteOffset, want);
+        for (let j = 0; j < want; j++) if (got[j] !== data[i * this.xfer + j]) return false;
+      }
+      P("照合", n, n);
+      await this.toIdle();
+      return true;
+    } catch (e) { this.log("（読み戻しの照合はできませんでした：" + e.message + "）"); return null; }
+  }
+  // 再起動（書き込みモードを抜けて、新しいファームで起動する）
+  async leave() {
+    try { await this.toIdle(); await this.cmd(0x21, FLASH_BASE, "番地の指定"); } catch (e) {}
+    try { await this.ctl("out", DFU.DNLOAD, 0, new Uint8Array(0)); } catch (e) {}
+    try { await this.getStatus(); } catch (e) {}   // ここで再起動するので、切れても正常
+    try { await this.dev.close(); } catch (e) {}
+  }
+}
+
+/* 書き込みの画面 */
+let fw = null, flashing = false;
+function usbLog(msg, cls) {
+  const el = $("usbLog"); el.style.display = "";
+  el.innerHTML += (cls ? `<span class="${cls}">${escapeHtml(msg)}</span>` : escapeHtml(msg)) + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+function usbProgress(step, i, n) {
+  $("usbProg").style.display = "";
+  const w = { 消去: [0, 15], 書き込み: [15, 80], 照合: [80, 100] }[step] || [0, 100];
+  $("usbBar").style.width = (w[0] + (w[1] - w[0]) * (n ? i / n : 1)) + "%";
+  $("usbStep").textContent = `${step}中… ${n ? Math.round(i / n * 100) : 100}%`;
+}
+async function setFirmware(file) {
+  fw = null; $("btnUsbFlash").disabled = true;
+  try {
+    const f = await readFirmwareFile(file);
+    const bad = checkFirmware(f.data);
+    if (bad) { $("fwInfo").textContent = `${f.name}：${bad}`; $("fwInfo").className = "hint warn-text"; return; }
+    fw = f;
+    $("fwInfo").textContent = `${f.name}（${(f.data.length / 1024).toFixed(1)} KB）` + (f.others ? `　※zip の中に .bin が ${f.others + 1} 個あったので、最初の1つを使います` : "");
+    $("fwInfo").className = "hint";
+    $("btnUsbFlash").disabled = !navigator.usb;
+  } catch (e) { $("fwInfo").textContent = "読み込めませんでした：" + e.message; $("fwInfo").className = "hint warn-text"; }
+}
+async function usbFlash() {
+  if (!navigator.usb) { $("usbUnsupported").style.display = ""; return; }
+  if (!fw || flashing) return;
+  if (!confirm("書き込むと、Launcherで作ったマクロ（M0〜M15）とキー割り当ては消えます。\nLauncherでエクスポートしましたか？　（Launcherのページも閉じてください）")) return;
+  let dev;
+  try { dev = await navigator.usb.requestDevice({ filters: [STM32_DFU] }); }
+  catch (e) {
+    usbLog("キーボードが選ばれませんでした。一覧に「STM32 BOOTLOADER」が無いときは、まだ書き込みモードに入っていません（リセットボタンを押したまま USB を挿し直す。ライトが消えたままなら書き込みモード）。", "ng");
+    return;
+  }
+  flashing = true; $("btnUsbFlash").disabled = true; $("btnFwPick").disabled = true;
+  window.onbeforeunload = () => "書き込み中です";
+  $("usbLog").innerHTML = ""; usbLog(`ファーム：${fw.name}`);
+  const d = new DfuSe(dev, m => usbLog(m));
+  try {
+    await d.open();
+    await d.flash(fw.data, usbProgress);
+    usbLog("書き込みました。");
+    const v = await d.verify(fw.data, usbProgress);
+    if (v === false) throw new Error("読み戻した内容が、選んだファームと一致しません");
+    usbLog(v ? "読み戻して照合しました（一致）。" : "（照合は飛ばしました）");
+    $("usbStep").textContent = "再起動中…"; $("usbBar").style.width = "100%";
+    await d.leave();
+    usbLog("完了しました。キーボードが新しいファームで再起動します。Launcherで「インポート」して設定を戻し、USBを抜いて10秒後に挿し直して、残っているか確認してください。", "ok");
+    $("usbStep").textContent = "完了";
+  } catch (e) {
+    const m = String(e && e.message || e);
+    let hint = "";
+    if (/claim|Unable to|Access denied|SecurityError|NetworkError/i.test(m + (e && e.name))) hint = "\n→ Launcher・QMK Toolbox・別のタブなど、ほかのソフトがキーボードを使っていないか確かめて、閉じてからやり直してください。";
+    usbLog("失敗しました：" + m + hint + "\n→ キーボードは書き込みモードのまま安全です。もう一度押してやり直すか、Launcherの「ファームウェアアップデート」で純正に戻せます。", "ng");
+    $("usbStep").textContent = "失敗";
+    try { await dev.close(); } catch (e2) {}
+  } finally {
+    flashing = false; window.onbeforeunload = null;
+    $("btnUsbFlash").disabled = !fw; $("btnFwPick").disabled = false;
+  }
+}
+if (!navigator.usb) $("usbUnsupported").style.display = "";
+$("btnFwPick").onclick = () => $("fwFile").click();
+$("fwFile").onchange = e => { const f = e.target.files && e.target.files[0]; if (f) setFirmware(f); e.target.value = ""; };
+$("btnUsbFlash").onclick = usbFlash;
+{
+  const box = document.querySelector(".usbflash");
+  if (box) {
+    box.ondragover = e => { if ([...(e.dataTransfer.types || [])].includes("Files")) { e.preventDefault(); box.classList.add("drop"); } };
+    box.ondragleave = () => box.classList.remove("drop");
+    box.ondrop = e => { e.preventDefault(); box.classList.remove("drop"); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) setFirmware(f); };
+  }
+}
 
 /* ===== GitHub でビルド（自分の非公開リポジトリを開くだけ。トークンなどは使わない） ===== */
 function ghRepo() {
