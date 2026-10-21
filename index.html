@@ -1,0 +1,1873 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Q0 Max keymap.c メーカー</title>
+<style>
+  :root {
+    --bg: #1b1d22; --panel: #24272e; --panel2: #2d3139; --line: #3a3f49;
+    --text: #e8eaee; --sub: #9aa1ad; --accent: #7c6cf0; --warn: #f0b03c; --err: #ef6a6a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Yu Gothic UI", "Meiryo UI", "Segoe UI", sans-serif; font-size: 14px; }
+  header { padding: 14px 24px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 16px; }
+  header h1 { font-size: 18px; margin: 0; white-space: nowrap; }
+  header p { margin: 0; color: var(--sub); font-size: 13px; }
+  main { display: grid; grid-template-columns: 420px 1fr; gap: 20px; padding: 20px 24px; align-items: start; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .card + .card { margin-top: 16px; }
+  .card h2 { font-size: 14px; margin: 0 0 12px; color: var(--sub); font-weight: 600; white-space: nowrap; }
+
+  /* レイヤータブ */
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .tab { flex: 1; padding: 8px 0; border-radius: 8px; border: 1px solid var(--line); background: var(--panel2);
+    color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+  .tab.on { border-color: var(--text); background: #383d47; font-weight: 600; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 1px solid #0006; flex: none; }
+
+  /* キーボード */
+  .kbd-wrap { display: flex; justify-content: center; }
+  .kbd { display: grid; grid-template-columns: repeat(5, 62px); grid-template-rows: repeat(6, 54px); gap: 6px;
+    padding: 14px; background: #15171b; border-radius: 12px; border: 1px solid var(--line); }
+  .key { border-radius: 7px; border: 2px solid transparent; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    text-align: center; font-size: 12px; line-height: 1.15; padding: 2px; color: #fff; word-break: break-all; overflow: hidden; user-select: none; }
+  .key.trns { color: #ffffff70; font-style: italic; }
+  .key.knob { border-radius: 50%; }
+  .key.sel { border-color: #fff !important; box-shadow: 0 0 0 2px #fff4; }
+  .enc { display: flex; gap: 8px; margin-top: 12px; justify-content: center; }
+  .enc .key { width: 150px; height: 40px; font-size: 12px; }
+  .enc-cap { font-size: 11px; color: #ffffffa0; display: block; }
+
+  /* 色 */
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .sw { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--text);
+    cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+  .sw.on { border-color: #fff; }
+  .slider { display: grid; grid-template-columns: 52px 1fr 38px; align-items: center; gap: 8px; margin: 6px 0; }
+  .slider label { color: var(--sub); font-size: 13px; white-space: nowrap; }
+  .slider input { width: 100%; }
+  .slider output { text-align: right; font-variant-numeric: tabular-nums; }
+  #hueBar { height: 8px; border-radius: 4px; margin: 0 46px 0 60px;
+    background: linear-gradient(to right, red, yellow, lime, cyan, blue, magenta, red); }
+
+  /* 割り当て */
+  .selinfo { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .selinfo .now { font-size: 22px; font-weight: 700; }
+  .selinfo .where { color: var(--sub); }
+  .selinfo .code { font-family: Consolas, monospace; color: var(--sub); font-size: 12px; }
+  .row-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  button.b { padding: 7px 14px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel2); color: var(--text);
+    cursor: pointer; font-size: 13px; white-space: nowrap; font-family: inherit; }
+  button.b:hover { border-color: #fff8; }
+  button.b.primary { background: var(--accent); border-color: var(--accent); }
+  .mods { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 4px 0 6px; }
+  .mods label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; cursor: pointer; }
+  .hint { color: var(--sub); font-size: 12px; margin: 4px 0 0; }
+  .groups { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 10px; }
+  .gbtn { padding: 6px 11px; border-radius: 16px; border: 1px solid var(--line); background: transparent; color: var(--text);
+    cursor: pointer; font-size: 13px; white-space: nowrap; font-family: inherit; }
+  .gbtn.on { background: #e8eaee; color: #1b1d22; border-color: #e8eaee; font-weight: 600; }
+  .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+  .item { padding: 9px 4px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel2); color: var(--text);
+    cursor: pointer; font-size: 13px; text-align: center; font-family: inherit; line-height: 1.2; }
+  .item:hover { border-color: #fff8; }
+  .item.cur { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .item small { display: block; color: var(--sub); font-size: 11px; margin-top: 2px; word-break: break-all; }
+  .gnote { color: var(--sub); font-size: 12px; margin: 0 0 8px; }
+  .raw { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+  .raw input { flex: 1; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--line); background: #15171b; color: var(--text);
+    font-family: Consolas, monospace; }
+  .empty { color: var(--sub); font-size: 13px; margin: 0 0 8px; }
+  .mac { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; background: var(--panel2); }
+  .mac-head { display: flex; gap: 8px; align-items: center; }
+  .mac-head .no { font-weight: 700; font-size: 16px; white-space: nowrap; display: flex; align-items: center; gap: 2px; }
+  .mac-head .no input.noedit { width: 46px; font-weight: 700; font-size: 16px; padding: 2px 4px; border-radius: 5px;
+    border: 1px solid var(--line); background: #15171b; color: var(--text); font-family: inherit; }
+  .mac-head .noarrows { display: flex; flex-direction: column; gap: 1px; }
+  .mac-head .noarrows button { padding: 0 6px; line-height: 1.3; font-size: 11px; }
+  .mac-head .toggle { width: 24px; flex: none; }
+  .mac-head .grab { cursor: grab; font-size: 16px; color: var(--sub); padding: 0 2px; user-select: none; flex: none; }
+  .mac-head .grab:active { cursor: grabbing; }
+  .mac.dragging { opacity: .4; }
+  .mac.dragover { outline: 2px dashed var(--accent); outline-offset: 2px; }
+  .mac-head .macsum { color: var(--sub); font-size: 12px; white-space: nowrap; flex: none; }
+  .codebox { display: flex; align-items: flex-start; gap: 6px; margin: 8px 0; background: #15171b;
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+  .codebox .codetext { flex: 1; min-width: 0; font-family: Consolas, monospace; font-size: 12px; resize: vertical;
+    background: #0f1114; color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 6px; word-break: break-all; }
+  .codebox .codetext.dirty { border-color: var(--warn); }
+  .codebox .codebtns { display: flex; flex-direction: column; gap: 4px; }
+  .codemsg { margin: -2px 0 6px; }
+  .codemsg.bad { color: var(--warn); }
+  .mac input, .mac select { padding: 6px 9px; border-radius: 6px; border: 1px solid var(--line); background: #15171b; color: var(--text);
+    min-width: 0; font-family: inherit; font-size: 13px; }
+  .mac-head input { flex: 1; }
+  .mac .where { color: var(--sub); font-size: 12px; margin: 6px 0 2px; }
+  .step { display: grid; grid-template-columns: 22px 104px 1fr auto auto auto; gap: 6px; align-items: center; margin-top: 6px; }
+  .step .n { color: var(--sub); font-size: 12px; text-align: right; }
+  .step .ty { color: var(--sub); font-size: 12px; white-space: nowrap; }
+  .step select.ty { width: 104px; padding: 4px 4px; font-size: 12px; cursor: pointer; }
+  .step.is-text select.ty { align-self: start; margin-top: 2px; }
+  .step input.txt { font-family: Consolas, monospace; }
+  .step .unit { display: flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--sub); font-size: 12px; }
+  .step .unit input { width: 90px; }
+  .keybtn { text-align: left; }
+  .keybtn.picking { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  button.mini { padding: 4px 9px; font-size: 12px; }
+  .add-steps { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .banner { background: #2e2a55; border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; margin: 0 0 10px;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+
+  /* 出力 */
+  .warns { margin: 0; padding: 0; list-style: none; }
+  .warns li { padding: 6px 10px; border-radius: 6px; background: #3a2f17; color: #ffd890; margin-bottom: 6px; font-size: 13px; }
+  .warns li.ok { background: #1e3325; color: #9fe0b0; }
+  .out-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .status { color: #9fe0b0; font-size: 13px; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--sub); }
+  pre { background: #121418; border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; max-height: 420px;
+    font-family: Consolas, monospace; font-size: 12px; line-height: 1.45; margin: 8px 0 0; }
+
+  /* 見出しのナビ */
+  header { flex-wrap: wrap; row-gap: 6px; }
+  header nav { display: flex; gap: 6px; margin-left: auto; }
+  header nav a { color: var(--text); text-decoration: none; font-size: 13px; padding: 4px 10px; border: 1px solid var(--line);
+    border-radius: 14px; white-space: nowrap; }
+  header nav a:hover { border-color: #fff8; }
+  .card { scroll-margin-top: 12px; }
+
+  /* キー図：長い名前は文字を小さくして収める。書き込みモードのキーの印 */
+  .key { position: relative; white-space: nowrap; word-break: normal; }
+  .key.wrap { white-space: normal; word-break: break-all; }
+  .badge { position: absolute; top: 2px; right: 3px; font-size: 9px; line-height: 1; padding: 2px 3px; border-radius: 3px;
+    background: #f0b03c; color: #1b1d22; font-style: normal; font-weight: 700; }
+  .badge-inline { display: inline-block; font-size: 10px; line-height: 1; padding: 2px 4px; border-radius: 3px;
+    background: #f0b03c; color: #1b1d22; font-weight: 700; vertical-align: 1px; }
+
+  /* マクロの手順 */
+  .step.is-text { align-items: start; }
+  .step.is-text .n { padding-top: 8px; }
+  .txtwrap { min-width: 0; }
+  .step textarea.txt { width: 100%; resize: vertical; min-height: 32px; padding: 6px 9px; border-radius: 6px; border: 1px solid var(--line);
+    background: #15171b; color: var(--text); font-family: Consolas, "Yu Gothic UI", monospace; font-size: 13px; line-height: 1.4; display: block; }
+  .txtinfo { color: var(--sub); font-size: 11px; margin-top: 3px; min-height: 14px; }
+  .txtinfo.bad { color: #ffd890; }
+  .ty-down { color: #9fd0ff !important; }
+  .ty-up { color: #c9b8ff !important; }
+  .heldnote { color: #ffd890; font-size: 12px; margin: 8px 0 0; }
+  .mac.flash { border-color: var(--accent); box-shadow: 0 0 0 2px #7c6cf055; transition: box-shadow .3s; }
+  .item.new { border-style: dashed; color: #c9c2ff; }
+
+  /* Launcher のコードから作る */
+  details.imp { margin-top: 12px; border: 1px dashed var(--line); border-radius: 8px; padding: 8px 12px; }
+  details.imp summary { color: var(--text); }
+  details.imp textarea { width: 100%; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--line); background: #15171b;
+    color: var(--text); font-family: Consolas, monospace; font-size: 12px; resize: vertical; }
+  .imp-row { display: flex; gap: 8px; margin-top: 8px; }
+  .imp-row input { flex: 1; min-width: 0; padding: 6px 9px; border-radius: 6px; border: 1px solid var(--line); background: #15171b;
+    color: var(--text); font-family: inherit; font-size: 13px; }
+
+  /* ビルドと書き込み */
+  .path { font-family: Consolas, monospace; font-size: 12px; color: var(--text); word-break: break-all; }
+  .homerow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .homerow label { color: var(--sub); font-size: 13px; white-space: nowrap; }
+  .homerow input { width: 260px; padding: 6px 9px; border-radius: 6px; border: 1px solid var(--line); background: #15171b;
+    color: var(--text); font-family: Consolas, monospace; font-size: 13px; }
+  ol.flow { margin: 0; padding-left: 22px; line-height: 1.6; }
+  ol.flow > li { margin-bottom: 8px; }
+  ol.flow ul { margin: 4px 0; padding-left: 18px; color: var(--sub); font-size: 13px; }
+  .cmd { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .cmd code { flex: 1; min-width: 0; background: #121418; border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px;
+    font-family: Consolas, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+  .warnline { display: block; color: #ffd890; font-size: 13px; }
+  .card h3 { font-size: 13px; margin: 14px 0 8px; color: var(--text); font-weight: 600; }
+  .card h2 + .status + h3 { margin-top: 4px; }
+  #cardOut .status { display: block; min-height: 18px; margin: -4px 0 4px; }
+  .dirinfo { color: var(--sub); font-size: 13px; }
+  .dirinfo.ok { color: #9fe0b0; }
+  .saverow { display: flex; gap: 8px; margin-bottom: 6px; }
+  .saverow input, .saverow select { flex: 1; min-width: 0; padding: 6px 9px; border-radius: 6px; border: 1px solid var(--line);
+    background: #15171b; color: var(--text); font-family: inherit; font-size: 13px; }
+  button.b:disabled { opacity: .45; cursor: default; }
+  .flashbox { background: #1e2a22; border: 1px solid #3c6b4a; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  .flashbox .out-btns { margin-bottom: 4px; }
+  .undobar { position: fixed; right: 18px; bottom: 18px; z-index: 50; display: flex; gap: 6px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px; box-shadow: 0 4px 16px #0008; }
+  .undobar button { white-space: nowrap; }
+  .layer-move { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .layer-move .lm-label { color: var(--sub); font-size: 13px; white-space: nowrap; }
+  .layer-move .chk { margin-left: 4px; }
+  .tab.dragover { outline: 2px dashed var(--accent); outline-offset: 2px; }
+  .tab.dragging { opacity: .4; }
+  .undo-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .undo-row button { white-space: nowrap; }
+  .undo-btn:not(:disabled) { border-color: #9fd0ff; color: #cfe8ff; }
+  .undo-msg { margin: 0; flex: 1 1 160px; min-width: 0; }
+  .chk { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; color: var(--sub); font-size: 13px; white-space: nowrap; cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Q0 Max keymap.c メーカー</h1>
+  <p>レイヤーを選ぶ → 色を決める → キーをクリックして割り当てを選ぶ → 「keymap.c を保存」 → ビルドと書き込み</p>
+  <nav>
+    <a href="#cardAssign">キーの割り当て</a>
+    <a href="#cardMacro">マクロ（M16〜）</a>
+    <a href="#cardOut">保存</a>
+    <a href="#cardBuild">ビルドと書き込み</a>
+  </nav>
+</header>
+<div class="undobar">
+  <button class="b undo-btn" id="btnUndo" data-undo="-1" disabled>↶ 戻る</button>
+  <button class="b undo-btn" id="btnRedo" data-undo="1" disabled>↷ 進む</button>
+</div>
+
+<main>
+  <!-- 左：レイヤー・色・キーボード -->
+  <div>
+    <div class="card">
+      <div class="tabs" id="tabs"></div>
+      <div class="layer-move">
+        <span class="lm-label">このレイヤーを丸ごと</span>
+        <button class="b mini" id="btnLayerLeft" title="ひとつ左（番号の小さい方）のレイヤーと入れ替え">← 左へ</button>
+        <button class="b mini" id="btnLayerRight" title="ひとつ右（番号の大きい方）のレイヤーと入れ替え">右へ →</button>
+        <label class="chk" title="オン：TO(1)などのキーが、動いたレイヤーの中身を追いかける（番号が書き換わる）&#10;オフ：TO(1)などは番号のまま（1番に来た中身へ行く）">
+          <input type="checkbox" id="layerFollow"> TO・MO などの行き先も追いかける</label>
+      </div>
+      <p class="hint" style="margin:2px 0 10px">キー・ノブ・色をまとめて入れ替えます。タブをドラッグして入れ替えることもできます。</p>
+      <h2>このレイヤーの色</h2>
+      <div class="swatches" id="swatches"></div>
+      <div id="hueBar"></div>
+      <div class="slider"><label for="hue">色相</label><input type="range" id="hue" min="0" max="255"><output id="hueV"></output></div>
+      <div class="slider"><label for="sat">鮮やかさ</label><input type="range" id="sat" min="0" max="255"><output id="satV"></output></div>
+    </div>
+
+    <div class="card">
+      <h2>キー（クリックして選ぶ）</h2>
+      <div class="kbd-wrap"><div class="kbd" id="kbd"></div></div>
+      <div class="enc" id="enc"></div>
+    </div>
+  </div>
+
+  <!-- 右：割り当て・出力 -->
+  <div>
+    <div class="card" id="cardAssign">
+      <h2>選んだキーの割り当て</h2>
+      <div class="banner" id="pickBanner" style="display:none">
+        <span id="pickText"></span>
+        <button class="b" id="btnPickCancel">やめる</button>
+      </div>
+      <div class="selinfo" id="selInfo">
+        <span class="now" id="selNow"></span>
+        <span class="where" id="selWhere"></span>
+        <span class="code" id="selCode"></span>
+      </div>
+      <div class="row-btns">
+        <button class="b" id="btnTrns">Pass-through にする</button>
+        <button class="b" id="btnDefault">最初の割り当てに戻す</button>
+      </div>
+      <div class="undo-row">
+        <button class="b undo-btn" data-undo="-1" disabled>↶ ひとつ前に戻る</button>
+        <button class="b undo-btn" data-undo="1" disabled>↷ 進む</button>
+        <span class="hint undo-msg" id="undoMsg"></span>
+      </div>
+
+      <div class="groups" id="groups"></div>
+      <div class="mods" id="modsRow">
+        <span style="color:var(--sub);font-size:13px;white-space:nowrap">同時に押す：</span>
+        <label><input type="checkbox" id="mCtrl"> Ctrl</label>
+        <label><input type="checkbox" id="mShift"> Shift</label>
+        <label><input type="checkbox" id="mAlt"> Alt</label>
+        <label><input type="checkbox" id="mWin"> Win</label>
+      </div>
+      <p class="hint" id="modsHint">チェックを入れてから下のキーを押すと「Ctrl+C」のような組み合わせになります。</p>
+      <p class="gnote" id="gnote"></p>
+      <div class="items" id="items"></div>
+
+      <div class="raw">
+        <input id="rawIn" placeholder="QMKのキーコードを直接入力（例：KC_F13、LCTL(KC_Z)）">
+        <button class="b" id="rawBtn">設定</button>
+      </div>
+    </div>
+
+    <div class="card" id="cardMacro">
+      <h2>マクロ（M16〜）を作る　※数の上限なし・好きなキーに置ける</h2>
+      <p class="hint" style="margin:0 0 10px">M0〜M15 はLauncherで作るマクロ、<b>M16 から先はここで作るマクロ</b>です（ファームに書き込むので、電源を切っても焼き直しても消えません）。<br>
+        作ったマクロは、上の「選んだキーの割り当て」の「マクロ（M16〜）」から、どのレイヤーのどのキーにも置けます。</p>
+      <div class="row-btns" id="macroBulk">
+        <button class="b mini" id="btnOpenAll">全部開く</button>
+        <button class="b mini" id="btnCloseAll">全部閉じる</button>
+      </div>
+      <div id="macros"></div>
+      <div class="row-btns">
+        <button class="b" id="btnAddMacro">＋ マクロを追加</button>
+      </div>
+      <details class="imp" id="impBox">
+        <summary>Launcherのマクロのコードから作る（{+KC_LGUI}{KC_Z}… を貼り付け）</summary>
+        <p class="hint">Launcherのマクロ画面の「コード入力」に出るコードを、そのまま貼り付けてください。
+          {KC_A}＝押して離す、{+KC_A}＝押したまま、{-KC_A}＝離す、{100}＝100ミリ秒待つ、{KC_LCTL,KC_C}＝同時押し、{ } の外の文字＝文字列。</p>
+        <textarea id="impText" rows="3" spellcheck="false" placeholder="{+KC_LGUI}{+KC_Z}{-KC_Z}{-KC_LGUI}{150}{+KC_P6}{-KC_P6}"></textarea>
+        <div class="imp-row">
+          <input id="impMemo" placeholder="メモ（例：Win+Z+6+1）" maxlength="20">
+          <button class="b primary" id="btnImp">新しいマクロにする</button>
+        </div>
+        <p class="hint" id="impMsg"></p>
+      </details>
+      <p class="hint">手順は上から順に実行します。「文字列」は半角英数字・記号・改行（Enter）が打てます。貼り付けた全角の英数字や記号は自動で半角に直します。日本語（ひらがな・漢字）はキーボードからは打てません。<br>
+        文字列を打つときは、パソコンの日本語入力をオフ（半角英数）にしておいてください。オンのままだとひらがなに変換されます。</p>
+    </div>
+
+    <div class="card">
+      <h2>チェック</h2>
+      <ul class="warns" id="warns"></ul>
+    </div>
+
+    <div class="card" id="cardOut">
+      <h2>保存・読み込み</h2>
+      <span class="status" id="status"></span>
+
+      <h3>QMKのフォルダと直接やり取り（おすすめ）</h3>
+      <div class="out-btns">
+        <button class="b primary" id="btnDirSave">QMKのフォルダに保存</button>
+        <button class="b" id="btnDirLoad">QMKのフォルダから読み込む</button>
+        <button class="b" id="btnDirPick">保存先フォルダを選び直す</button>
+        <span class="dirinfo" id="dirInfo">保存先：まだ選んでいません</span>
+      </div>
+      <p class="hint">最初の1回だけ、フォルダ <span class="path" id="savePath"></span> を選びます（1つ上の keymaps フォルダを選んでもOK）。<button class="b mini" data-copy="savePath">場所をコピー</button><br>
+        フォルダを選ぶ画面で、上のアドレス欄に貼り付けると早いです。<br>
+        2回目からはボタン1つで keymap.c を上書き保存／読み込みできます（ブラウザに「許可しますか」と聞かれたら許可）。<br>
+        <b>このツールを開くと、まずそのフォルダの keymap.c（本物。ビルドで使われる方）を自動で読み込みます。</b>
+        手でファイルを編集したときや、他のパソコン・ブラウザで開いたときも、このフォルダの中身が優先されます。
+        読み込めなかったときだけ、下の「このパソコンに保存」の自動保存から続きを開きます。</p>
+
+      <h3>このパソコンに保存（名前を付けて）</h3>
+      <div class="saverow">
+        <input id="saveName" placeholder="名前（例：普段用、ズーム用）" maxlength="30">
+        <button class="b" id="btnNamedSave">名前を付けて保存</button>
+      </div>
+      <div class="saverow">
+        <select id="saveList"></select>
+        <button class="b" id="btnNamedOpen">開く</button>
+        <button class="b" id="btnNamedDel">削除</button>
+      </div>
+      <p class="hint"><span id="autoInfo"></span>　編集した内容は自動で保存され、次に開いたときは続きから始まります。保存先はこのパソコンのブラウザの中です（ブラウザの閲覧データを消すと消えます。別のパソコンには引き継がれません）。大事な版は「keymap.c をファイルに保存」でも残してください。</p>
+
+      <h3>ファイルとして</h3>
+      <div class="out-btns">
+        <button class="b" id="btnSave">keymap.c をファイルに保存</button>
+        <button class="b" id="btnCopy">コードをコピー</button>
+        <button class="b" id="btnLoad">keymap.c を読み込む</button>
+        <button class="b" id="btnReset">全部最初に戻す</button>
+        <input type="file" id="fileIn" accept=".c,.txt" hidden>
+      </div>
+      <p class="hint">このツールで作った keymap.c は、あとで「読み込む」で続きから直せます。古いソース（wireless_playground）用に作った keymap.c も読み込めます（キー名は自動で新しい名前に直します）。</p>
+      <details>
+        <summary>コードを見る</summary>
+        <pre id="code"></pre>
+      </details>
+    </div>
+
+    <div class="card" id="cardBuild">
+      <h2>ビルドと書き込み</h2>
+      <p class="hint">キーの割り当て・マクロの作成・保存・下のコマンドの表示は、この <b>keymap_maker.html 1つだけで完結</b>します（他のファイルは不要）。他の人に渡すときも、このファイル1つで大丈夫です。<br>
+        「保存して焼く」ボタンと <code>q0max_flash.bat</code> は、<b>このパソコンだけの近道</b>です（無くても、下の 2・3 のコマンドを自分でQMK MSYSにコピーすれば同じことができます）。</p>
+      <p class="hint" id="webNote" style="display:none">Web版（GitHub Pages）で開いています。「保存して焼く」ボタンは、ダウンロードして自分のパソコンで使う版だけの機能なので、ここでは表示していません。下の「GitHub でビルドする」か、2・3 のコマンドを使ってください。</p>
+      <div class="flashbox" id="flashBox">
+        <div class="out-btns">
+          <button class="b primary" id="btnFlash">保存して焼く（このパソコン専用）</button>
+          <span class="hint" style="margin:0">QMKのフォルダに保存 → 書き込み用の黒い画面が開き、ビルドと書き込みを自動で行います</span>
+        </div>
+        <p class="hint" id="flashMsg">使う前に、このツールと同じフォルダの <b>q0max_ボタン登録.bat</b> を1回だけダブルクリックしてください（このボタンから黒い画面を開けるようにする設定です）。<br>
+          ボタンで開かないときは、同じフォルダの <b>q0max_flash.bat</b> をダブルクリックしても同じことができます。<br>
+          黒い画面に「書き込みモードにしてください」と出たら、下の 4 の方法で書き込みモードにします。焼く前のエクスポート（下の 1）も忘れずに。</p>
+      </div>
+      <h3>手で行う場合（QMK MSYS で）</h3>
+      <div class="homerow">
+        <label for="qmkHome">QMKのソースの場所</label>
+        <input id="qmkHome" spellcheck="false">
+        <span class="hint" style="margin:0">（qmk setup の -H で指定した場所）</span>
+      </div>
+      <ol class="flow">
+        <li><b>焼く前に</b>：Launcherで「エクスポート」して設定を保存しておく。
+          <span class="warnline">別のファームを焼くと、Launcherで作ったマクロ（M0〜M15）とキー割り当ては消えます。</span>
+          <label class="chk"><input type="checkbox"> エクスポートした</label></li>
+        <li>上の「keymap.c を保存」で、保存先に上書き保存する。</li>
+        <li><b>ビルドだけ</b>してエラーが無いか確かめる（最後に [OK] が並べば成功）：
+          <div class="cmd"><code id="cmdCompile"></code><button class="b mini" data-copy="cmdCompile">コピー</button></div></li>
+        <li><b>書き込む</b>：
+          <div class="cmd"><code id="cmdFlash"></code><button class="b mini" data-copy="cmdFlash">コピー</button></div>
+          「Bootloader not found … Trying again」と出たら、キーボードを書き込みモードにする：
+          <ul>
+            <li>USBを抜き、背面スイッチを<b>真ん中（Cable）</b>にする</li>
+            <li><b>0のキーキャップ下のリセットボタン</b>を押したまま挿す（いちばん確実）。または左のキー図で <span class="badge-inline">書込</span> の印があるキー（元Escの位置）を押したまま挿す</li>
+            <li>ライトが<b>消えたまま</b>なら書き込みモード。点いたら普通に起動しているので、抜いてやり直す</li>
+            <li>ノブを押しながら挿す方法は使えません。Launcherの「ESC長押し」も、このファームでは元Escの位置のキーのことです</li>
+          </ul>
+          途中の「dfuERROR … firmware is corrupt」は正常。「File downloaded successfully」が出たら完了。</li>
+        <li><b>焼いた後に</b>：Launcherで「インポート」して設定を戻す。一番上の列が TO(0)〜TO(3) になっているかも確認。
+          <label class="chk"><input type="checkbox"> インポートした</label></li>
+        <li><b>保存が残るか確認</b>：Launcherを閉じ、USBを抜いて10秒待ってから挿し直す（書込の印のキーやリセットボタンには触らない）。Launcherを開き直して、マクロとキー割り当てが残っていればOK。
+          <label class="chk"><input type="checkbox"> 残っていた</label></li>
+      </ol>
+      <h3>GitHub でビルドする（QMK MSYS が無いパソコン向け）</h3>
+      <p class="hint">自分用の<b>非公開（Private）</b>リポジトリに keymap.c を上げると、GitHub がビルドして .bin を作ります（作り方は配布元のリポジトリの説明を見てください）。
+        keymap.c は自分のパソコンと自分の非公開リポジトリにしか置かれません。<b>公開（Public）のリポジトリには上げないでください</b>（公開リポジトリではビルドしない作りになっています）。</p>
+      <div class="homerow">
+        <label for="ghRepo">自分の非公開リポジトリ</label>
+        <input id="ghRepo" placeholder="例：yamada/q0max-mine（ユーザー名/リポジトリ名）" spellcheck="false">
+      </div>
+      <div class="out-btns">
+        <button class="b" id="btnGhSave">1. keymap.c をファイルに保存</button>
+        <button class="b" id="btnGhUpload">2. アップロード画面を開く</button>
+        <button class="b" id="btnGhActions">3. ビルドの様子（Actions）を開く</button>
+      </div>
+      <p class="hint" id="ghMsg">2 の画面に、1 で保存した keymap.c をドラッグして「Commit changes」。3 で緑のチェックになったら、その行を開いて「Artifacts」から .bin をダウンロードし、QMK Toolbox か Launcher で書き込みます。</p>
+      <p class="hint">純正に戻すとき：Launcherの「ファームウェアアップデート」→ リセットボタンを押したまま挿す →「デバイスをマッチ」で「STM32 BOOTLOADER」を選ぶ →「Flash Firmware」。</p>
+    </div>
+  </div>
+</main>
+
+<script>
+"use strict";
+
+/* ===== 物理配置（LAYOUT_tenkey_27 の順番） ===== */
+const ROWS = [5, 5, 5, 4, 5, 3];
+// [列, 行, 横幅, 縦幅]
+const POS = [
+  [1,1,1,1],[2,1,1,1],[3,1,1,1],[4,1,1,1],[5,1,1,1],
+  [1,2,1,1],[2,2,1,1],[3,2,1,1],[4,2,1,1],[5,2,1,1],
+  [1,3,1,1],[2,3,1,1],[3,3,1,1],[4,3,1,1],[5,3,1,2],
+  [1,4,1,1],[2,4,1,1],[3,4,1,1],[4,4,1,1],
+  [1,5,1,1],[2,5,1,1],[3,5,1,1],[4,5,1,1],[5,5,1,2],
+  [1,6,1,1],[2,6,2,1],[4,6,1,1],
+];
+const BOOT_KEY = 1;   // 書き込みモードのキー（matrix [0,1]＝元Escの位置。2025q3 の info.json の bootmagic）
+const POS_NAME = ["ノブ押し","上段1（元Esc）","上段2（元Del）","上段3（元Tab）","上段4（元BS）",
+  "M1の位置","NumLockの位置","/ の位置","* の位置","- の位置",
+  "M2の位置","7 の位置","8 の位置","9 の位置","+ の位置",
+  "M3の位置","4 の位置","5 の位置","6 の位置",
+  "M4の位置","1 の位置","2 の位置","3 の位置","Enterの位置",
+  "左下（FN）","0 の位置",". の位置"];
+
+/* ===== 初期値（今の keymap.c と同じ） ===== */
+const T = "KC_TRNS";
+const DEFAULT = {
+  layers: [
+    { hue:170, sat:255, enc:["KC_VOLD","KC_VOLU"], keys:[
+      "KC_MUTE","TO(0)","TO(1)","TO(2)","TO(3)",
+      "MC_1","KC_NUM","KC_PSLS","KC_PAST","KC_PMNS",
+      "MC_2","KC_P7","KC_P8","KC_P9","KC_PPLS",
+      "MC_3","KC_P4","KC_P5","KC_P6",
+      "MC_4","KC_P1","KC_P2","KC_P3","KC_PENT",
+      "MO(1)","KC_P0","KC_PDOT"] },
+    { hue:0, sat:255, enc:["UG_VALD","UG_VALU"], keys:[
+      "UG_TOGG",T,T,T,T,
+      "BT_HST1","UG_NEXT","UG_VALU","UG_HUEU",T,
+      "BT_HST2","UG_PREV","UG_VALD","UG_HUED",T,
+      "BT_HST3","UG_SATU","UG_SPDU","KC_MPRV",
+      "P2P4G","UG_SATD","UG_SPDD","KC_MPLY",T,
+      T,"UG_TOGG","KC_MNXT"] },
+    { hue:85, sat:255, enc:["KC_VOLD","KC_VOLU"], keys:Array(27).fill(T) },
+    { hue:191, sat:255, enc:["UG_VALD","UG_VALU"], keys:Array(27).fill(T) },
+  ],
+  // マクロ M16〜：no はマクロ番号（消しても番号は使い回さない）。キーコードは MX_<no>
+  // steps：{t:"text", v:文字列} / {t:"key", v:キーコード} / {t:"wait", v:ミリ秒}
+  // ※ ここには個人情報（メールアドレスなど）を入れない。他の人に渡す可能性があるため、最初の状態は空にしておく。
+  macros: [],
+};
+const MACRO_FIRST = 16;   // Launcherの M0〜M15 の次から
+const MACRO_MAX = 16 + 447; // QK_USER_0〜QK_USER_MAX に入る数
+
+/* ===== 選べるキー ===== */
+const range = (a, b) => Array.from({length: b - a + 1}, (_, i) => a + i);
+const GROUPS = [
+  { id:"basic", name:"よく使う", mod:true, items:[
+    ["KC_ESC","Esc"],["KC_TAB","Tab"],["KC_ENT","Enter"],["KC_BSPC","BackSpace"],["KC_DEL","Delete"],
+    ["KC_SPC","Space"],["KC_INS","Insert"],["KC_PSCR","PrintScreen"],["KC_APP","メニュー"],
+    ["KC_UP","↑"],["KC_DOWN","↓"],["KC_LEFT","←"],["KC_RGHT","→"],
+    ["KC_HOME","Home"],["KC_END","End"],["KC_PGUP","PageUp"],["KC_PGDN","PageDown"]] },
+  { id:"mx", name:"マクロ（M16〜）", dynamic:true, items:[],
+    note:"このツールで作るマクロです（数の上限なし）。「＋ 新しく作る」を押すと、選んでいるキーに置いたうえで、下の「マクロ（M16〜）を作る」に手順の入力欄が出ます。" },
+  { id:"num", name:"テンキー", mod:true, items:[
+    ...range(0,9).map(n => ["KC_P"+n, String(n)]),
+    ["KC_PDOT","."],["KC_PSLS","/"],["KC_PAST","*"],["KC_PMNS","-"],["KC_PPLS","+"],
+    ["KC_PENT","Enter","テンキー"],["KC_NUM","NumLock"],["KC_PEQL","="],["KC_PCMM",","]] },
+  { id:"alpha", name:"英字", mod:true, items: range(65,90).map(c => ["KC_"+String.fromCharCode(c), String.fromCharCode(c)]) },
+  { id:"digit", name:"数字", mod:true, items: [...range(1,9), 0].map(n => ["KC_"+n, String(n), "上の段"]) },
+  { id:"sym", name:"記号", mod:true,
+    note:"日本語配列のパソコンでその記号が出るキーです。",
+    items:[
+    ["JP_MINS","-"],["JP_CIRC","^"],["JP_YEN","¥"],["JP_AT","@"],["JP_LBRC","["],["JP_RBRC","]"],
+    ["JP_SCLN",";"],["JP_COLN",":"],["JP_COMM",","],["JP_DOT","."],["JP_SLSH","/"],["JP_BSLS","\\","ろ"],
+    ["JP_EXLM","!"],["JP_DQUO","\""],["JP_HASH","#"],["JP_DLR","$"],["JP_PERC","%"],["JP_AMPR","&"],
+    ["JP_QUOT","'"],["JP_LPRN","("],["JP_RPRN",")"],["JP_EQL","="],["JP_TILD","~"],["JP_PIPE","|"],
+    ["JP_GRV","`"],["JP_LCBR","{"],["JP_RCBR","}"],["JP_PLUS","+"],["JP_ASTR","*"],["JP_LABK","<"],
+    ["JP_RABK",">"],["JP_QUES","?"],["JP_UNDS","_"]] },
+  { id:"jp", name:"日本語入力", mod:true, items:[
+    ["JP_ZKHK","半角/全角"],["JP_MHEN","無変換"],["JP_HENK","変換"],["JP_KANA","かな"],["JP_EISU","英数"]] },
+  { id:"fkey", name:"F1〜F24", mod:true, items: range(1,24).map(n => ["KC_F"+n, "F"+n]) },
+  { id:"modk", name:"修飾キー", items:[
+    ["KC_LCTL","Ctrl","左"],["KC_LSFT","Shift","左"],["KC_LALT","Alt","左"],["KC_LGUI","Win","左"],
+    ["KC_RCTL","Ctrl","右"],["KC_RSFT","Shift","右"],["KC_RALT","Alt","右"],["KC_RGUI","Win","右"]] },
+  { id:"layer", name:"レイヤー",
+    note:"TO＝そのレイヤーへ移動（色も変わる）／MO＝押している間だけ／TG＝押すたびに入る・戻る",
+    items:[
+    ...range(0,3).map(n => ["TO("+n+")","L"+n+"へ","TO"]),
+    ...range(1,3).map(n => ["MO("+n+")","L"+n,"押す間だけ"]),
+    ...range(1,3).map(n => ["TG("+n+")","L"+n+"切替","TG"])] },
+  { id:"media", name:"メディア", items:[
+    ["KC_MUTE","ミュート"],["KC_VOLU","音量+"],["KC_VOLD","音量-"],["KC_MPLY","再生/停止"],
+    ["KC_MNXT","次の曲"],["KC_MPRV","前の曲"],["KC_MSTP","停止"],["KC_BRIU","画面明るく"],["KC_BRID","画面暗く"],
+    ["KC_CALC","電卓"],["KC_MYCM","PC"],["KC_WWW_HOME","ブラウザ"]] },
+  { id:"win", name:"Windows", items:[
+    ["KC_TASK","タスクビュー"],["KC_FILE","エクスプローラー"],["LGUI(LSFT(KC_S))","スクショ","Win+Shift+S"]] },
+  { id:"mouse", name:"マウス", items:[
+    ["MS_BTN1","左クリック"],["MS_BTN2","右クリック"],["MS_BTN3","中クリック"],
+    ["MS_UP","カーソル↑"],["MS_DOWN","カーソル↓"],["MS_LEFT","カーソル←"],["MS_RGHT","カーソル→"],
+    ["MS_WHLU","ホイール↑"],["MS_WHLD","ホイール↓"],["MS_WHLL","ホイール←","横スクロール"],["MS_WHLR","ホイール→","横スクロール"]] },
+  { id:"light", name:"ライト",
+    note:"色はレイヤーの色で決まるので、色相・彩度・エフェクトのキーは見た目に効きません。ON/OFFと明るさは効きます。",
+    items:[
+    ["UG_TOGG","ライトON/OFF"],["UG_VALU","明るく"],["UG_VALD","暗く"],
+    ["UG_NEXT","Mode+"],["UG_PREV","Mode-"],["UG_HUEU","Hue+"],["UG_HUED","Hue-"],
+    ["UG_SATU","Sat+"],["UG_SATD","Sat-"],["UG_SPDU","Speed+"],["UG_SPDD","Speed-"]] },
+  { id:"wl", name:"無線", items:[
+    ["BT_HST1","BT 1台目"],["BT_HST2","BT 2台目"],["BT_HST3","BT 3台目"],["P2P4G","2.4G"],["BAT_LVL","電池残量"]] },
+  { id:"macro", name:"Launcherマクロ（M0〜M15）",
+    note:"Launcherの「マクロ」で登録した内容を打ちます（中身はLauncherで作る。16個まで）。もっと作りたいときは「マクロ（M16〜）」を使ってください。",
+    items: range(0,15).map(n => ["MC_"+n, "M"+n]) },
+  { id:"special", name:"その他", items:[
+    ["KC_TRNS","Pass-through","下のレイヤーと同じ"],["KC_NO","何もしない"],
+    ["QK_BOOT","書込モードへ","1回押すとUSB抜き差し無しで書き込みモードに入る"]] },
+  { id:"short", name:"ショートカット",
+    note:"Windowsでよく使う組み合わせです。アプリによっては効かないものもあります。ここに無い組み合わせは「よく使う」「英字」などで「同時に押す」にチェックを入れて作れます。",
+    items:[
+    // 編集
+    ["LCTL(KC_C)","コピー","Ctrl+C"],["LCTL(KC_X)","切り取り","Ctrl+X"],["LCTL(KC_V)","貼り付け","Ctrl+V"],
+    ["LCTL(LSFT(KC_V))","書式なし貼付","Ctrl+Shift+V"],
+    ["LCTL(KC_Z)","元に戻す","Ctrl+Z"],["LCTL(KC_Y)","やり直し","Ctrl+Y"],["LCTL(KC_A)","全選択","Ctrl+A"],
+    ["LCTL(KC_S)","保存","Ctrl+S"],["LCTL(KC_F)","検索","Ctrl+F"],["LCTL(KC_H)","置換","Ctrl+H"],
+    ["LCTL(KC_P)","印刷","Ctrl+P"],["LCTL(KC_N)","新規","Ctrl+N"],["LCTL(KC_O)","開く","Ctrl+O"],
+    ["LCTL(KC_HOME)","先頭へ","Ctrl+Home"],["LCTL(KC_END)","末尾へ","Ctrl+End"],
+    // タブ・表示
+    ["LCTL(KC_T)","新しいタブ","Ctrl+T"],["LCTL(KC_W)","タブを閉じる","Ctrl+W"],["LCTL(LSFT(KC_T))","閉じたタブ","Ctrl+Shift+T"],
+    ["LCTL(KC_TAB)","次のタブ","Ctrl+Tab"],["LCTL(LSFT(KC_TAB))","前のタブ","Ctrl+Shift+Tab"],
+    ["LCTL(KC_PPLS)","拡大","Ctrl+＋"],["LCTL(KC_PMNS)","縮小","Ctrl+−"],["LCTL(KC_0)","拡大を戻す","Ctrl+0"],
+    // ホイール（ノブの左回し・右回しに置くと便利）
+    ["LCTL(MS_WHLU)","ホイール拡大","Ctrl+ホイール↑"],["LCTL(MS_WHLD)","ホイール縮小","Ctrl+ホイール↓"],
+    ["LSFT(MS_WHLU)","横スクロール←","Shift+ホイール↑（左へ）"],["LSFT(MS_WHLD)","横スクロール→","Shift+ホイール↓（右へ）"],
+    ["MS_WHLL","ホイール←","横スクロール（左）"],["MS_WHLR","ホイール→","横スクロール（右）"],
+    ["LCTL(LSFT(MS_WHLU))","Ctrl+Shift+↑","Ctrl+Shift+ホイール↑"],["LCTL(LSFT(MS_WHLD))","Ctrl+Shift+↓","Ctrl+Shift+ホイール↓"],
+    ["LALT(MS_WHLU)","Alt+ホイール↑","Alt+ホイール↑"],["LALT(MS_WHLD)","Alt+ホイール↓","Alt+ホイール↓"],
+    // ウィンドウ・Windows
+    ["LALT(KC_TAB)","アプリ切替","Alt+Tab"],["LALT(KC_F4)","閉じる","Alt+F4"],
+    ["LGUI(KC_D)","デスクトップ","Win+D"],["LGUI(KC_E)","エクスプローラ","Win+E"],["LGUI(KC_L)","ロック","Win+L"],
+    ["LGUI(KC_V)","クリップ履歴","Win+V"],["LGUI(KC_DOT)","絵文字","Win+."],["LGUI(KC_I)","設定","Win+I"],
+    ["LGUI(KC_R)","実行","Win+R（ファイル名を指定して実行）"],["LCTL(LSFT(KC_ESC))","タスク管理","Ctrl+Shift+Esc（タスクマネージャー）"],
+    ["LGUI(KC_LEFT)","左半分","Win+←"],["LGUI(KC_RGHT)","右半分","Win+→"],["LGUI(KC_UP)","最大化","Win+↑"],["LGUI(KC_DOWN)","最小化","Win+↓"],
+    ["LGUI(KC_Z)","スナップ","Win+Z"],["LGUI(LCTL(KC_LEFT))","デスクトップ←","Win+Ctrl+←（前の仮想デスクトップ）"],["LGUI(LCTL(KC_RGHT))","デスクトップ→","Win+Ctrl+→（次の仮想デスクトップ）"],
+    ["LGUI(KC_PSCR)","スクショ保存","Win+PrintScreen"],["LALT(KC_PSCR)","窓のスクショ","Alt+PrintScreen"]] },
+];
+const LABEL = {};
+const SUB = {};
+const GROUP_OF = {};
+GROUPS.forEach(g => g.items.forEach(([c, l, s]) => { LABEL[c] = l; if (s) SUB[c] = s; if (!GROUP_OF[c]) GROUP_OF[c] = g; }));
+// 旧ソース（wireless_playground）で使っていたキー名 → 2025q3 での名前（読み込み時に置き換える）
+const LEGACY = {
+  RGB_TOG:"UG_TOGG", RGB_MOD:"UG_NEXT", RGB_RMOD:"UG_PREV", RGB_HUI:"UG_HUEU", RGB_HUD:"UG_HUED",
+  RGB_SAI:"UG_SATU", RGB_SAD:"UG_SATD", RGB_VAI:"UG_VALU", RGB_VAD:"UG_VALD", RGB_SPI:"UG_SPDU", RGB_SPD:"UG_SPDD",
+  KC_BTN1:"MS_BTN1", KC_BTN2:"MS_BTN2", KC_BTN3:"MS_BTN3",
+  KC_MS_U:"MS_UP", KC_MS_D:"MS_DOWN", KC_MS_L:"MS_LEFT", KC_MS_R:"MS_RGHT", KC_WH_U:"MS_WHLU", KC_WH_D:"MS_WHLD",
+  KC_TASK_VIEW:"KC_TASK", KC_FILE_EXPLORER:"KC_FILE", KC_SCREEN_SHOT:"LGUI(LSFT(KC_S))",
+};
+const MODS = [["LCTL","Ctrl","mCtrl"],["LSFT","Shift","mShift"],["LALT","Alt","mAlt"],["LGUI","Win","mWin"]];
+
+/* キーコード → 表示名 */
+// マクロの手順に入れられるキー（ふつうのキー入力として送れるもの）
+const STEP_GROUPS = ["basic","num","alpha","digit","sym","jp","fkey","modk","media","mouse","short"];
+const macOf = code => { const m = /^MX_(\d+)$/.exec(code); return m ? S.macros.find(x => x.no === +m[1]) : null; };
+function label(code) {
+  if (/^MX_\d+$/.test(code)) { const x = macOf(code); return x ? "M" + x.no + (x.memo ? " " + x.memo : "") : code; }
+  if (LABEL[code] !== undefined) {
+    const g = GROUP_OF[code];
+    if (g && g.id === "layer") {
+      const m = code.match(/^(TO|MO|TG)\((\d)\)$/);
+      if (m[1] === "TO") return "→L" + m[2];
+      if (m[1] === "MO") return "MO L" + m[2];
+      return "L" + m[2] + "切替";
+    }
+    return LABEL[code];
+  }
+  const mods = [];
+  let c = code;
+  for (;;) {
+    const m = c.match(/^(LCTL|LSFT|LALT|LGUI)\((.*)\)$/);
+    if (!m) break;
+    mods.push(MODS.find(x => x[0] === m[1])[1]);
+    c = m[2];
+  }
+  if (mods.length && LABEL[c] !== undefined) return mods.join("+") + "+" + label(c);
+  return code;
+}
+function isKnown(code) {
+  if (/^MX_\d+$/.test(code)) return !!macOf(code);
+  let c = code;
+  for (;;) { const m = c.match(/^(LCTL|LSFT|LALT|LGUI)\((.*)\)$/); if (!m) break; c = m[2]; }
+  return LABEL[c] !== undefined;
+}
+
+/* ===== 色（QMKと同じ 0〜255 の HSV） ===== */
+function hsv2rgb(h, s, v) {
+  h = h / 256 * 6; s /= 255; v /= 255;
+  const i = Math.floor(h) % 6, f = h - Math.floor(h);
+  const p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+  const [r, g, b] = [[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]][i];
+  return [r, g, b].map(x => Math.round(x * 255));
+}
+const css = (h, s, v = 255, a = 1) => { const [r, g, b] = hsv2rgb(h, s, v); return `rgba(${r},${g},${b},${a})`; };
+const PRESETS = [["青",170,255],["赤",0,255],["緑",85,255],["紫",191,255],["黄",43,255],["橙",21,255],["水色",128,255],["桃",213,255],["白",0,0]];
+
+/* ===== 状態 ===== */
+let S = JSON.parse(JSON.stringify(DEFAULT));
+let cur = 0;                         // 編集中のレイヤー
+let sel = { type: "key", idx: 1 };   // 選択中のキー
+let group = "basic";
+let pick = null;                     // マクロの手順のキーを選んでいるとき { no, idx }
+// 開いている／コード表示中のマクロ（番号ではなくマクロそのものを覚える。番号を変えても開閉の状態がずれない）
+let macroOpen = new Set();
+let macroCode = new Set();
+let dragFromNo = null;               // ドラッグでつかんでいるマクロの番号
+
+const $ = id => document.getElementById(id);
+
+function pickStep() {
+  if (!pick) return null;
+  const x = S.macros.find(m => m.no === pick.no);
+  return x && x.steps[pick.idx] ? x.steps[pick.idx] : null;
+}
+function getCode() {
+  const st = pickStep();
+  if (st) return st.v;
+  const L = S.layers[cur];
+  return sel.type === "key" ? L.keys[sel.idx] : L.enc[sel.idx];
+}
+// レイヤーを丸ごと動かす（from 番を to 番の位置へ。間のレイヤーは1つずつずれる）
+// follow=true のときは、TO(n)・MO(n) などの行き先の番号も、動いた中身を追いかけて書き換える
+function moveLayer(from, to, follow) {
+  const n = S.layers.length;
+  if (from === to || from < 0 || to < 0 || from >= n || to >= n) return false;
+  const order = range(0, n - 1);             // order[新しい番号] = 元の番号
+  order.splice(to, 0, order.splice(from, 1)[0]);
+  const newOf = []; order.forEach((old, nw) => { newOf[old] = nw; });
+  S.layers = order.map(i => S.layers[i]);
+  if (follow) {
+    const fix = c => typeof c !== "string" ? c : c
+      .replace(/\b(TO|MO|TG|TT|OSL|DF|PDF)\((\d+)\)/g, (m, f, d) => newOf[+d] != null ? `${f}(${newOf[+d]})` : m)
+      .replace(/\bLT\((\d+),/g, (m, d) => newOf[+d] != null ? `LT(${newOf[+d]},` : m);
+    S.layers.forEach(l => { l.keys = l.keys.map(fix); l.enc = l.enc.map(fix); });
+    S.macros.forEach(x => x.steps.forEach(st => { if (KEY_STEPS.includes(st.t)) st.v = fix(st.v); }));
+  }
+  if (cur === from) cur = to; else cur = newOf[cur];
+  return true;
+}
+function moveLayerUI(from, to) {
+  const n = S.layers.length;
+  if (to < 0 || to >= n || from === to) return;
+  if ((from === 0 || to === 0) && !confirm("レイヤー0は土台のレイヤーです（USBを挿した直後はここから始まり、他のレイヤーの Pass-through はレイヤー0のキーになります）。\n入れ替えてよいですか？")) return;
+  const follow = $("layerFollow").checked;
+  moveLayer(from, to, follow);
+  pick = null; render();
+  flash(`レイヤー${from} をレイヤー${to} に動かしました` + (follow ? "（TO・MO などの行き先も追いかけました）" : ""));
+}
+function setCode(code) {
+  const st = pickStep();
+  if (st) {
+    st.v = code;
+    pick = null;
+    renderMacros(); render();
+    return;
+  }
+  const L = S.layers[cur];
+  if (sel.type === "key") L.keys[sel.idx] = code; else L.enc[sel.idx] = code;
+  render();
+}
+
+/* ===== 描画 ===== */
+function render() {
+  const L = S.layers[cur];
+  $("btnLayerLeft").disabled = cur <= 0;
+  $("btnLayerRight").disabled = cur >= S.layers.length - 1;
+
+  // タブ
+  $("tabs").innerHTML = "";
+  S.layers.forEach((ly, i) => {
+    const b = document.createElement("button");
+    b.className = "tab" + (i === cur ? " on" : "");
+    b.innerHTML = `<span class="dot" style="background:${css(ly.hue, ly.sat)}"></span>レイヤー${i}`;
+    b.onclick = () => { cur = i; render(); };
+    // タブのドラッグで入れ替え
+    b.draggable = true;
+    b.ondragstart = e => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/x-layer", String(i)); b.classList.add("dragging"); };
+    b.ondragend = () => { b.classList.remove("dragging"); document.querySelectorAll(".tab.dragover").forEach(t => t.classList.remove("dragover")); };
+    b.ondragover = e => { if ([...e.dataTransfer.types].includes("text/x-layer")) { e.preventDefault(); b.classList.add("dragover"); } };
+    b.ondragleave = () => b.classList.remove("dragover");
+    b.ondrop = e => {
+      const s = e.dataTransfer.getData("text/x-layer"); if (s === "") return;
+      e.preventDefault(); b.classList.remove("dragover");
+      moveLayerUI(+s, i);
+    };
+    $("tabs").appendChild(b);
+  });
+
+  // 色
+  $("swatches").innerHTML = "";
+  PRESETS.forEach(([n, h, s]) => {
+    const b = document.createElement("button");
+    const on = (s === 0 && L.sat === 0) || (s !== 0 && L.hue === h && L.sat === s);
+    b.className = "sw" + (on ? " on" : "");
+    b.innerHTML = `<span class="dot" style="background:${css(h, s)}"></span>${n}`;
+    b.onclick = () => { L.hue = h; L.sat = s; render(); };
+    $("swatches").appendChild(b);
+  });
+  $("hue").value = L.hue; $("hueV").textContent = L.hue;
+  $("sat").value = L.sat; $("satV").textContent = L.sat;
+
+  // キーボード
+  const base = S.layers[0];
+  $("kbd").innerHTML = "";
+  POS.forEach(([c, r, w, h], i) => {
+    const d = document.createElement("div");
+    const code = L.keys[i];
+    const trns = code === "KC_TRNS" && cur > 0;
+    d.className = "key" + (i === 0 ? " knob" : "") + (trns ? " trns" : "") + (sel.type === "key" && sel.idx === i ? " sel" : "");
+    d.style.gridColumn = `${c} / span ${w}`;
+    d.style.gridRow = `${r} / span ${h}`;
+    d.style.background = trns ? css(L.hue, L.sat, 255, 0.10) : css(L.hue, L.sat, 255, 0.38);
+    d.style.borderColor = sel.type === "key" && sel.idx === i ? "#fff" : css(L.hue, L.sat, 255, 0.55);
+    d.innerHTML = `<span class="lbl">${escapeHtml(trns ? "▽ " + label(base.keys[i]) : label(code))}</span>`;
+    d.title = POS_NAME[i] + "：" + code;
+    if (i === BOOT_KEY) {
+      d.insertAdjacentHTML("beforeend", `<span class="badge">書込</span>`);
+      d.title += "\n（このキーを押したままUSBを挿すと書き込みモード。保存内容も消えるので、普段の抜き差しでは押さない）";
+    }
+    if (code === "QK_BOOT") {
+      d.insertAdjacentHTML("beforeend", `<span class="badge">書込</span>`);
+      d.title += "\n（起動中にこのキーを1回押すだけで書き込みモードに入る。USBの抜き差しは不要）";
+    }
+    d.onclick = () => { sel = { type: "key", idx: i }; pick = null; render(); };
+    $("kbd").appendChild(d);
+    fitLabel(d);
+  });
+  $("enc").innerHTML = "";
+  [["ノブ 左回し", 0], ["ノブ 右回し", 1]].forEach(([n, j]) => {
+    const d = document.createElement("div");
+    const on = sel.type === "enc" && sel.idx === j;
+    d.className = "key" + (on ? " sel" : "");
+    d.style.background = css(L.hue, L.sat, 255, 0.38);
+    d.style.borderColor = on ? "#fff" : css(L.hue, L.sat, 255, 0.55);
+    d.innerHTML = `<span><span class="enc-cap">${n}</span>${escapeHtml(label(L.enc[j]))}</span>`;
+    d.onclick = () => { sel = { type: "enc", idx: j }; pick = null; render(); };
+    $("enc").appendChild(d);
+  });
+
+  // 選択中
+  const st = pickStep();
+  if (!st) pick = null;
+  const code = getCode();
+  $("pickBanner").style.display = st ? "flex" : "none";
+  $("selInfo").style.display = st ? "none" : "flex";
+  $("btnTrns").parentElement.style.display = st ? "none" : "flex";
+  if (st) {
+    $("pickText").textContent = `マクロ M${pick.no} の手順${pick.idx + 1}で押すキーを、下から選んでください（いま：${st.v ? label(st.v) : "未設定"}）`;
+    if (!STEP_GROUPS.includes(group)) group = "basic";
+  }
+  $("selNow").textContent = code === "KC_TRNS" && cur > 0 ? "Pass-through" : label(code);
+  $("selWhere").textContent = `レイヤー${cur}・` + (sel.type === "key" ? POS_NAME[sel.idx] : (sel.idx ? "ノブ 右回し" : "ノブ 左回し"));
+  $("selCode").textContent = code;
+
+  // グループ（マクロの手順を選んでいるときは、送れるキーのグループだけ）
+  $("groups").innerHTML = "";
+  GROUPS.filter(g => !st || STEP_GROUPS.includes(g.id)).forEach(g => {
+    const b = document.createElement("button");
+    b.className = "gbtn" + (g.id === group ? " on" : "");
+    b.textContent = g.name;
+    b.onclick = () => { group = g.id; render(); };
+    $("groups").appendChild(b);
+  });
+  const G = GROUPS.find(g => g.id === group);
+  $("modsRow").style.display = G.mod ? "flex" : "none";
+  $("modsHint").style.display = G.mod ? "block" : "none";
+  $("gnote").textContent = G.note || "";
+  $("gnote").style.display = G.note ? "block" : "none";
+  $("items").innerHTML = "";
+  const items = G.dynamic ? S.macros.map(x => ["MX_" + x.no, "M" + x.no, x.memo || macroSummary(x)]) : G.items;
+  if (G.dynamic) items.push(["__NEW__", "＋ 新しく作る", "このキーに置く"]);
+  items.forEach(([c, l, s]) => {
+    const b = document.createElement("button");
+    b.className = "item" + (c === code ? " cur" : "") + (c === "__NEW__" ? " new" : "");
+    b.innerHTML = escapeHtml(l) + (s ? `<small>${escapeHtml(s)}</small>` : "");
+    b.title = c === "__NEW__" ? "新しいマクロ（M16〜）を作って、選んでいるキーに置きます" : c;
+    if (c === "__NEW__") {
+      b.onclick = () => { const x = newMacro(); renderMacros(); setCode("MX_" + x.no); focusMacro(x.no); };
+      $("items").appendChild(b);
+      return;
+    }
+    b.onclick = () => {
+      let out = c;
+      if (G.mod) {
+        for (let k = MODS.length - 1; k >= 0; k--) if ($(MODS[k][2]).checked) out = `${MODS[k][0]}(${out})`;
+      }
+      setCode(out);
+    };
+    $("items").appendChild(b);
+  });
+
+  // マクロがどこに置かれているか・選択中の手順の見た目
+  S.macros.forEach(x => {
+    const el = $("where_" + x.no);
+    if (el) el.textContent = placesOf("MX_" + x.no);
+  });
+  document.querySelectorAll(".keybtn").forEach(b => {
+    b.classList.toggle("picking", !!pick && +b.dataset.no === pick.no && +b.dataset.idx === pick.idx);
+  });
+
+  renderWarns();
+  $("code").textContent = generate();
+  refreshCodeBoxes();
+  autosave();
+  recordHistory();
+}
+
+// キーの名前が収まるまで文字を小さくする（9px でも収まらないときだけ折り返す）
+function fitLabel(el) {
+  el.classList.remove("wrap");
+  let size = 12;
+  el.style.fontSize = size + "px";
+  if (!el.clientWidth) return;
+  const over = () => el.scrollWidth > el.clientWidth;
+  while (over() && size > 9) { size--; el.style.fontSize = size + "px"; }
+  if (over()) el.classList.add("wrap");
+}
+
+function placesOf(code) {
+  const p = [];
+  S.layers.forEach((l, li) => {
+    l.keys.forEach((c, i) => { if (c === code) p.push(`レイヤー${li}・${POS_NAME[i]}`); });
+    l.enc.forEach((c, j) => { if (c === code) p.push(`レイヤー${li}・ノブ${j ? "右" : "左"}回し`); });
+  });
+  return p.length ? "置いている場所：" + p.join("、") : "まだどのキーにも置いていません";
+}
+
+const STEP_NAME = { text: "文字列", key: "キー", down: "押したまま", up: "離す", wait: "待つ" };
+const KEY_STEPS = ["key", "down", "up"];
+// 手順の種類を変える。キー・押したまま・離すの間ではキーをそのまま引き継ぐ。それ以外は中身を作り直す
+function changeStepType(st, t) {
+  if (!STEP_NAME[t] || st.t === t) return st;
+  const from = st.t, v = st.v;
+  st.t = t;
+  if (KEY_STEPS.includes(from) && KEY_STEPS.includes(t)) st.v = v;
+  else if (t === "wait") st.v = from === "text" && /^\d+$/.test(String(v).trim()) ? Math.max(1, Math.min(60000, +v)) : 100;
+  else if (t === "text") st.v = from === "wait" ? String(v) : (KEY_STEPS.includes(from) && /^KC_[A-Z0-9]$/.test(v) ? v.slice(3).toLowerCase() : "");
+  else st.v = "";   // 文字列・待つ → キー：キーは選び直し
+  return st;
+}
+function macroSummary(x) {
+  const s = x.steps.map(st => {
+    if (st.t === "text") return st.v.replace(/\n/g, "⏎");
+    if (st.t === "wait") return st.v + "ms";
+    const k = st.v ? label(st.v) : "?";
+    return st.t === "down" ? k + "↓" : st.t === "up" ? k + "↑" : k;
+  }).join(" → ");
+  return s.length > 30 ? s.slice(0, 30) + "…" : (s || "（空）");
+}
+
+/* ===== 文字列の手順 ===== */
+// 全角英数・全角記号・全角スペース・きれいな引用符などを、打てる半角文字に直す
+function normalizeText(s) {
+  return String(s)
+    .replace(/\r\n?/g, "\n")
+    .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/　/g, " ")
+    .replace(/[‘’‚′]/g, "'")
+    .replace(/[“”„″]/g, "\"")
+    .replace(/[‐-―−]/g, "-")
+    .replace(/[¥￥]/g, "\\")      // ¥（日本語配列では \ と同じキー）
+    .replace(/\u00A0/g, " ")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "");   // 見えない文字は消す
+}
+// 打てない文字（半角英数字・記号・改行・タブ以外）
+const badChars = s => [...new Set([...String(s)].filter(c => !/[\x20-\x7e\n\t]/.test(c)))];
+function badCharsText(list) {
+  const shown = list.slice(0, 12).map(c => c === "\u200B" ? "(見えない文字)" : c).join(" ");
+  return shown + (list.length > 12 ? ` ほか${list.length - 12}種類` : "");
+}
+
+/* ===== Launcher のマクロコードを手順に変換 =====
+ * {KC_A}=押して離す、{+KC_A}=押したまま、{-KC_A}=離す、{100}=100ミリ秒待つ、
+ * {KC_LCTL,KC_C}=同時押し、{ } の外の文字=文字列 */
+function parseLauncher(src) {
+  const steps = [], unknown = [];
+  let buf = "";
+  const flush = () => { if (buf) { steps.push({ t: "text", v: normalizeText(buf) }); buf = ""; } };
+  const keyOk = k => { if (!isKnown(k)) unknown.push(k); return k; };
+  const re = /\{([^{}]*)\}|([^{}]+)|([{}])/g;
+  let m;
+  while ((m = re.exec(src))) {
+    if (m[2] !== undefined) { buf += m[2]; continue; }
+    if (m[3] !== undefined) { buf += m[3]; continue; }
+    const tok = m[1].replace(/\s+/g, "");
+    if (!tok) continue;
+    flush();
+    if (/^\d+$/.test(tok)) { steps.push({ t: "wait", v: Math.max(1, Math.min(60000, +tok)) }); continue; }
+    const pm = /^([+-])(.+)$/.exec(tok);
+    if (pm) { steps.push({ t: pm[1] === "+" ? "down" : "up", v: keyOk(pm[2]) }); continue; }
+    const keys = tok.split(",").filter(Boolean);
+    if (keys.length === 1) { steps.push({ t: "key", v: keyOk(keys[0]) }); continue; }
+    keys.forEach(k => steps.push({ t: "down", v: keyOk(k) }));
+    [...keys].reverse().forEach(k => steps.push({ t: "up", v: k }));
+  }
+  flush();
+  return { steps, unknown: [...new Set(unknown)] };
+}
+
+// マクロの最後で、押したまま離していないキー
+function heldAtEnd(x) {
+  const held = [];
+  x.steps.forEach(st => {
+    if (st.t === "down" && st.v && !held.includes(st.v)) held.push(st.v);
+    if (st.t === "up") { const i = held.indexOf(st.v); if (i >= 0) held.splice(i, 1); }
+  });
+  return held;
+}
+
+function sortMacros() { S.macros.sort((a, b) => a.no - b.no); }
+// start 以降で、まだ使っていない一番小さい番号を探す（無ければ末尾の次）
+function findFreeNo(start) {
+  const used = new Set(S.macros.map(m => m.no));
+  let n = Math.max(MACRO_FIRST, Math.round(start) || MACRO_FIRST);
+  while (used.has(n) && n < MACRO_MAX) n++;
+  return Math.min(n, MACRO_MAX);
+}
+function newMacro(memo, steps, no) {
+  no = no != null ? no : findFreeNo(S.macros.reduce((m, x) => Math.max(m, x.no), MACRO_FIRST - 1) + 1);
+  const x = { no, memo: memo || "", steps: steps || [] };
+  S.macros.push(x); sortMacros();
+  return x;
+}
+// 今あるマクロの内容をコピーして、できるだけ近い番号（空いている一番小さい番号）に新しく作る
+function duplicateMacro(x) {
+  const y = newMacro(x.memo ? x.memo + "のコピー" : "", JSON.parse(JSON.stringify(x.steps)), findFreeNo(x.no + 1));
+  return y;
+}
+// レイヤー・ノブの割り当てにある MX_oldNo を MX_newNo に置き換える（同時に複数組でも大丈夫なように、一旦別の印にしてから戻す）
+function renameMacroCode(pairs) {
+  const mark = pairs.map((_, i) => "\u0000M" + i);
+  const apply = (arr, from, to) => arr.map(c => { const i = from.indexOf(c); return i >= 0 ? to[i] : c; });
+  const codes = pairs.map(([a]) => "MX_" + a), marks = mark, news = pairs.map(([, b]) => "MX_" + b);
+  S.layers.forEach(l => {
+    l.keys = apply(apply(l.keys, codes, marks), marks, news);
+    l.enc = apply(apply(l.enc, codes, marks), marks, news);
+  });
+}
+// マクロの番号を変える。すでに使われている番号を指定したときは、その相手と番号を入れ替える
+function renumberMacro(x, wantNo) {
+  const newNo = Math.max(MACRO_FIRST, Math.min(MACRO_MAX, Math.round(wantNo) || x.no));
+  if (newNo === x.no) { renderMacros(); return; }
+  const other = S.macros.find(m => m.no === newNo && m !== x);
+  const oldNo = x.no;
+  if (other) { renameMacroCode([[oldNo, newNo], [newNo, oldNo]]); other.no = oldNo; }
+  else renameMacroCode([[oldNo, newNo]]);
+  x.no = newNo;
+  sortMacros(); renderMacros(); render(); focusMacro(x.no, null, false);   // 並べ替えでは開かない（開閉はそのまま）
+  flash(other ?`M${oldNo} と M${newNo} を入れ替えました` : `M${oldNo} を M${newNo} に変えました`);
+}
+// 一覧（番号の小さい順）で、ひとつ前／後ろのマクロと番号を入れ替える
+function swapMacroOrder(x, dir) {
+  const i = S.macros.findIndex(m => m === x);
+  const j = i + dir;
+  if (j < 0 || j >= S.macros.length) return;
+  renumberMacro(x, S.macros[j].no);
+}
+// ドラッグ＆ドロップでの並べ替え：fromNo のマクロを、toNo のマクロの位置へ動かす
+// （使われている番号の集合はそのまま。並んだ位置に合わせて番号を振り直す＝キーの割り当ても追従する）
+function reorderMacros(fromNo, toNo) {
+  if (fromNo === toNo) return;
+  const arr = S.macros;
+  const nos = arr.map(m => m.no);
+  const item = arr.find(m => m.no === fromNo);
+  const target = arr.find(m => m.no === toNo);
+  if (!item || !target) return;
+  const rest = arr.filter(m => m !== item);
+  let insertAt = rest.indexOf(target);
+  if (arr.indexOf(item) < arr.indexOf(target)) insertAt += 1;   // 後ろへ動かすときは、相手のうしろに入る
+  rest.splice(insertAt, 0, item);
+  const pairs = rest.map((m, i) => [m.no, nos[i]]).filter(([a, b]) => a !== b);
+  if (pairs.length) renameMacroCode(pairs);
+  rest.forEach((m, i) => { m.no = nos[i]; });
+  S.macros = rest; sortMacros();
+  const newNo = item.no;
+  renderMacros(); render(); focusMacro(newNo, null, false);   // 並べ替えでは開かない
+  flash(`M${fromNo} を M${newNo} に動かしました`);
+}
+// open=false のときは開閉の状態を変えず、場所を示すだけ（並べ替え・番号変更のとき）
+function focusMacro(no, what, open = true) {
+  const x = S.macros.find(m => m.no === no);
+  if (open && x && !macroOpen.has(x)) { macroOpen.add(x); renderMacros(); }
+  const card = $("mcard_" + no);
+  if (!card) return;
+  card.scrollIntoView({ block: "center", behavior: "smooth" });
+  card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 1500);
+  const el = what === "text" ? [...card.querySelectorAll("textarea.txt")].pop() : card.querySelector(".memo");
+  if (el) setTimeout(() => el.focus(), 300);
+}
+
+/* マクロの編集欄（追加・削除・並べ替え・読込のときだけ作り直す。入力中は作り直さない） */
+function renderMacros() {
+  const box = $("macros");
+  box.innerHTML = "";
+  if (!S.macros.length) box.innerHTML = `<p class="empty">マクロはまだありません。下の「＋ マクロを追加」か「Launcherのコードから作る」で作れます。</p>`;
+  S.macros.forEach(x => {
+    const open = macroOpen.has(x);
+    const showCode = macroCode.has(x);
+    const card = document.createElement("div");
+    card.className = "mac";
+    card.id = "mcard_" + x.no;
+    card.draggable = false;   // ⠿ を押している間だけ true（入力欄の文字選択をじゃましないため）
+    card.innerHTML = `<div class="mac-head">
+        <span class="grab" title="ドラッグしてつかみ、好きな場所へ移動できます">⠿</span>
+        <button class="b mini toggle" title="手順を開く／閉じる">${open ? "▾" : "▸"}</button>
+        <span class="noarrows">
+          <button class="b mini noup" title="ひとつ前（番号の小さい方）のマクロと入れ替え">↑</button>
+          <button class="b mini nodown" title="ひとつ後（番号の大きい方）のマクロと入れ替え">↓</button>
+        </span>
+        <span class="no">M<input type="number" class="noedit" min="${MACRO_FIRST}" max="${MACRO_MAX}" title="番号を変える（使われている番号を入れると入れ替えます）"></span>
+        <input class="memo" placeholder="メモ（例：メール）" maxlength="20">
+        <span class="macsum">${x.steps.length ? x.steps.length + " 手順" : "手順なし"}</span>
+        <button class="b mini codebtn" title="Launcherの「コード入力」と同じ形式で表示・編集">コード</button>
+        <button class="b mini dup" title="内容をコピーして、近い空き番号に新しく作る">複製</button>
+        <button class="b mini del">削除</button>
+      </div>
+      <div class="mac-body" style="display:${open ? "" : "none"}">
+      <div class="codebox" id="codebox_${x.no}" style="display:${showCode ? "" : "none"}">
+        <textarea class="codetext" rows="2" spellcheck="false" title="書き換えて「反映」を押すと、手順がこのコードの内容になります"></textarea>
+        <div class="codebtns">
+          <button class="b mini primary applycode" title="書き換えたコードを手順に反映">反映</button>
+          <button class="b mini revertcode" title="書き換えをやめて、今の手順のコードに戻す">元に戻す</button>
+          <button class="b mini copycode">コピー</button>
+        </div>
+      </div>
+      <p class="hint codemsg" style="display:none"></p>
+        <div class="steps"></div>
+        <div class="add-steps">
+          <button class="b mini" data-add="text">＋ 文字列</button>
+          <button class="b mini" data-add="key">＋ キー</button>
+          <button class="b mini" data-add="down">＋ 押したまま</button>
+          <button class="b mini" data-add="up">＋ 離す</button>
+          <button class="b mini" data-add="wait">＋ 待つ</button>
+        </div>
+        <div class="where" id="where_${x.no}"></div>
+      </div>`;
+    // ⠿ を押したときだけカードをドラッグできるようにする
+    // （dragstart の e.target はカード自身になるので、そこではハンドルかどうか判定できない）
+    const grab = card.querySelector(".grab");
+    grab.onpointerdown = () => { card.draggable = true; };
+    grab.onpointerup = () => { card.draggable = false; };
+    card.ondragstart = e => {
+      if (!card.draggable) { e.preventDefault(); return; }
+      dragFromNo = x.no;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(x.no));
+      card.classList.add("dragging");
+    };
+    card.ondragend = () => {
+      card.classList.remove("dragging"); card.draggable = false; dragFromNo = null;
+      document.querySelectorAll(".mac.dragover").forEach(c => c.classList.remove("dragover"));
+    };
+    card.ondragover = e => { e.preventDefault(); if (dragFromNo != null && dragFromNo !== x.no) card.classList.add("dragover"); };
+    card.ondragleave = () => card.classList.remove("dragover");
+    card.ondrop = e => {
+      e.preventDefault(); card.classList.remove("dragover");
+      const from = dragFromNo != null ? dragFromNo : parseInt(e.dataTransfer.getData("text/plain"), 10);
+      if (from != null && !Number.isNaN(from)) reorderMacros(from, x.no);
+    };
+    card.querySelector(".toggle").onclick = () => {
+      if (macroOpen.has(x)) { macroOpen.delete(x); macroCode.delete(x); }   // 閉じるとコード欄も閉じる
+      else macroOpen.add(x);
+      renderMacros();
+    };
+    const codeBox = card.querySelector(".codebox");
+    const codeTa = codeBox.querySelector(".codetext"), codeMsg = card.querySelector(".codemsg");
+    codeTa.value = launcherCode(x);
+    const growCode = () => { codeTa.style.height = "auto"; codeTa.style.height = Math.min(codeTa.scrollHeight + 2, 200) + "px"; };
+    setTimeout(growCode, 0);
+    const showCodeMsg = (t, bad) => { codeMsg.textContent = t; codeMsg.className = "hint codemsg" + (bad ? " bad" : ""); codeMsg.style.display = t ? "" : "none"; };
+    codeTa.oninput = () => { codeTa.classList.toggle("dirty", codeTa.value !== launcherCode(x)); growCode(); showCodeMsg(codeTa.classList.contains("dirty") ? "書き換え中です。「反映」を押すと手順がこの内容になります。" : ""); };
+    // Ctrl+Enter でも反映
+    codeTa.onkeydown = e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); codeBox.querySelector(".applycode").onclick(); } };
+    codeBox.querySelector(".applycode").onclick = () => {
+      const r = applyMacroCode(x, codeTa.value);
+      codeTa.classList.remove("dirty");
+      pick = null;
+      renderMacros(); render();
+      const m = card.isConnected ? null : $("mcard_" + x.no);
+      const msgEl = m ? m.querySelector(".codemsg") : codeMsg;
+      msgEl.textContent = `反映しました（手順 ${r.steps.length} 個）。` + (r.unknown.length ? `このツールが知らないキー名：${r.unknown.join("、")}（ビルドで失敗したら見直してください）。` : "");
+      msgEl.className = "hint codemsg" + (r.unknown.length ? " bad" : "");
+      msgEl.style.display = "";
+    };
+    codeBox.querySelector(".revertcode").onclick = () => { codeTa.value = launcherCode(x); codeTa.classList.remove("dirty"); growCode(); showCodeMsg(""); };
+    card.querySelector(".codebtn").onclick = () => {
+      if (macroCode.has(x)) macroCode.delete(x);
+      else { macroCode.add(x); macroOpen.add(x); }   // 閉じているマクロでコードを押したら、開いて見せる
+      renderMacros();
+    };
+    codeBox.querySelector(".copycode").onclick = e => copyText(e.target, codeTa.value);   // 書き換え中なら、その内容をコピー
+    const memo = card.querySelector(".memo");
+    memo.value = x.memo || "";
+    memo.oninput = () => { x.memo = memo.value; render(); };
+
+    const noInp = card.querySelector(".noedit");
+    noInp.value = x.no;
+    noInp.onchange = () => { renumberMacro(x, parseInt(noInp.value, 10)); };
+    const i = S.macros.indexOf(x);
+    card.querySelector(".noup").disabled = i === 0;
+    card.querySelector(".nodown").disabled = i === S.macros.length - 1;
+    card.querySelector(".noup").onclick = () => swapMacroOrder(x, -1);
+    card.querySelector(".nodown").onclick = () => swapMacroOrder(x, 1);
+    card.querySelector(".dup").onclick = () => { const y = duplicateMacro(x); renderMacros(); render(); focusMacro(y.no); flash(`M${x.no} を M${y.no} として複製しました`); };
+
+    card.querySelector(".del").onclick = () => {
+      const code = "MX_" + x.no;
+      const used = placesOf(code).startsWith("置いている");
+      if (!confirm(`M${x.no} を削除します。` + (used ? "\n置いているキーは「何もしない」になります。" : "") + "\nよろしいですか？")) return;
+      S.layers.forEach(l => {
+        l.keys = l.keys.map(c => c === code ? "KC_NO" : c);
+        l.enc = l.enc.map(c => c === code ? "KC_NO" : c);
+      });
+      S.macros = S.macros.filter(m => m !== x);
+      if (pick && pick.no === x.no) pick = null;
+      renderMacros(); render();
+    };
+
+    card.querySelectorAll("[data-add]").forEach(b => b.onclick = () => {
+      const t = b.dataset.add;
+      let v = t === "wait" ? 100 : "";
+      if (t === "up") { const h = heldAtEnd(x); if (h.length) v = h[h.length - 1]; }  // 押したままのキーを自動で選ぶ
+      x.steps.push({ t, v });
+      if ((t === "key" || t === "down" || t === "up") && !v) pick = { no: x.no, idx: x.steps.length - 1 };
+      renderMacros(); render();
+      if (t === "text") focusMacro(x.no, "text");
+    });
+
+    const stepsBox = card.querySelector(".steps");
+    stepsBox.id = "mac_" + x.no;
+    if (!x.steps.length) stepsBox.innerHTML = `<p class="empty" style="margin:8px 0 0">手順がありません。下のボタンで追加してください。</p>`;
+    x.steps.forEach((st, i) => {
+      const row = document.createElement("div");
+      row.className = "step" + (st.t === "text" ? " is-text" : "");
+      let body;
+      if (st.t === "text") body = `<div class="txtwrap"><textarea class="txt" rows="1" spellcheck="false" placeholder="打つ文字列（貼り付けOK。改行は Enter として打ちます）"></textarea><div class="txtinfo"></div></div>`;
+      else if (st.t === "wait") body = `<span class="unit"><input type="number" min="1" max="60000" step="10"> ミリ秒（1000で1秒）</span>`;
+      else body = `<button class="b mini keybtn" data-no="${x.no}" data-idx="${i}">${escapeHtml(st.v ? label(st.v) : "クリックしてキーを選ぶ")}</button>`;
+      const tyOpts = Object.entries(STEP_NAME).map(([t, n]) => `<option value="${t}"${t === st.t ? " selected" : ""}>${n}</option>`).join("");
+      row.innerHTML = `<span class="n">${i + 1}</span><select class="ty ty-${st.t}" title="手順の種類を変える">${tyOpts}</select>${body}
+        <button class="b mini up" title="上へ">↑</button><button class="b mini down" title="下へ">↓</button><button class="b mini rm" title="この手順を消す">×</button>`;
+      if (st.t === "text") {
+        const ta = row.querySelector("textarea"), info = row.querySelector(".txtinfo");
+        const grow = () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight + 2, 240) + "px"; };
+        const show = () => {
+          const bad = badChars(st.v), lines = st.v ? st.v.split("\n").length : 0;
+          const parts = [];
+          if (st.v) parts.push(`${st.v.length}文字` + (lines > 1 ? `・${lines}行（改行は Enter）` : ""));
+          info.className = "txtinfo" + (bad.length ? " bad" : "");
+          info.textContent = (bad.length ? `打てない文字があります：${badCharsText(bad)}　（日本語・全角の文字はキーボードからは打てません）　` : "") + parts.join("");
+        };
+        // 貼り付け・入力欄を離れたときに、全角英数などを半角に直す（日本語入力中は直さない）
+        const fix = () => {
+          const before = ta.value, after = normalizeText(before);
+          if (after !== before) { const p = ta.selectionStart; ta.value = after; ta.selectionStart = ta.selectionEnd = Math.min(p, after.length); info.dataset.fixed = "1"; }
+          st.v = ta.value; show(); grow(); render();
+          if (info.dataset.fixed) { info.textContent = "全角の英数字・記号を半角に直しました。　" + info.textContent; delete info.dataset.fixed; }
+        };
+        ta.value = st.v;
+        ta.oninput = e => { if (e.isComposing) return; st.v = ta.value; show(); grow(); render(); };
+        ta.addEventListener("compositionend", () => { st.v = ta.value; show(); render(); });
+        ta.addEventListener("paste", () => setTimeout(fix, 0));
+        ta.onchange = fix;
+        show(); setTimeout(grow, 0);
+      }
+      if (st.t === "wait") { const inp = row.querySelector("input"); inp.value = st.v; inp.oninput = () => { st.v = Math.max(1, Math.min(60000, parseInt(inp.value, 10) || 1)); render(); }; }
+      if (st.t === "key" || st.t === "down" || st.t === "up") row.querySelector(".keybtn").onclick = () => { pick = { no: x.no, idx: i }; render(); $("pickBanner").scrollIntoView({ block: "nearest", behavior: "smooth" }); };
+      const move = d => {
+        const j = i + d; if (j < 0 || j >= x.steps.length) return;
+        [x.steps[i], x.steps[j]] = [x.steps[j], x.steps[i]];
+        pick = null; renderMacros(); render();
+      };
+      row.querySelector("select.ty").onchange = e => {
+        changeStepType(st, e.target.value);
+        pick = KEY_STEPS.includes(st.t) && !st.v ? { no: x.no, idx: i } : null;   // キーが空になったら、そのままキー選びへ
+        renderMacros(); render();
+        if (pick) $("pickBanner").scrollIntoView({ block: "nearest", behavior: "smooth" });
+      };
+      row.querySelector(".up").onclick = () => move(-1);
+      row.querySelector(".down").onclick = () => move(1);
+      row.querySelector(".rm").onclick = () => { x.steps.splice(i, 1); pick = null; renderMacros(); render(); };
+      stepsBox.appendChild(row);
+    });
+    const held = heldAtEnd(x);
+    if (held.length) {
+      const p = document.createElement("p");
+      p.className = "heldnote";
+      p.textContent = `最後まで「離す」が無いキー：${held.map(label).join("、")}（押しっぱなしにならないよう、マクロの最後で自動的に離します）`;
+      stepsBox.appendChild(p);
+    }
+    box.appendChild(card);
+  });
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+/* ===== チェック ===== */
+function effective(li, i) {
+  // TO で li に入った状態：li と レイヤー0 だけが有効
+  const c = S.layers[li].keys[i];
+  return c === "KC_TRNS" ? S.layers[0].keys[i] : c;
+}
+function checks() {
+  const w = [];
+  const all = S.layers.flatMap(l => l.keys);
+  for (let li = 1; li < 4; li++) {
+    const reachable = all.includes(`TO(${li})`) || all.includes(`TG(${li})`);
+    if (!reachable) continue;
+    const eff = range(0, 26).map(i => effective(li, i));
+    const canBack = eff.some(c => /^TO\(\d\)$/.test(c) && c !== `TO(${li})`) || eff.includes(`TG(${li})`);
+    if (!canBack) w.push(`レイヤー${li}に入ると、ほかのレイヤーへ戻るキーがありません（TO のキーを置くか、Pass-through にしてください）。`);
+  }
+  if (!all.includes("TO(0)") && all.some(c => /^TO\([123]\)$/.test(c))) w.push("TO(0)（レイヤー0へ戻る）がどこにもありません。");
+  S.layers.forEach((l, li) => [...l.keys, ...l.enc].forEach(c => {
+    if (!isKnown(c) && !/^(TO|MO|TG)\(\d\)$/.test(c)) w.push(`レイヤー${li}の「${c}」はこのツールが知らないキーコードです。ビルドで失敗したら見直してください。`);
+  }));
+  S.macros.forEach(x => {
+    const n = "M" + x.no;
+    if (x.no > MACRO_MAX) w.push(`${n} は番号が大きすぎます（M${MACRO_MAX} まで）。`);
+    if (!x.steps.length) w.push(`${n} に手順がありません。`);
+    x.steps.forEach((st, i) => {
+      if (st.t === "text" && !st.v) w.push(`${n} の手順${i + 1}（文字列）が空です。`);
+      if (st.t === "text") {
+        const bad = badChars(st.v);
+        if (bad.length) w.push(`${n} の手順${i + 1}（文字列）に打てない文字があります：${badCharsText(bad)}。この文字は飛ばして出力します（日本語・全角の文字はキーボードからは打てません）。`);
+      }
+      if ((st.t === "key" || st.t === "down" || st.t === "up") && !st.v) w.push(`${n} の手順${i + 1}（${STEP_NAME[st.t]}）のキーがまだ選ばれていません。`);
+      if ((st.t === "key" || st.t === "down" || st.t === "up") && st.v && !isKnown(st.v)) w.push(`${n} の手順${i + 1}の「${st.v}」はこのツールが知らないキーコードです。ビルドで失敗したら見直してください。`);
+    });
+  });
+  return w;
+}
+function renderWarns() {
+  const w = checks();
+  $("warns").innerHTML = w.length ? w.map(x => `<li>${escapeHtml(x)}</li>`).join("") : `<li class="ok">問題は見つかりませんでした。</li>`;
+}
+
+/* ===== keymap.c 生成 ===== */
+// C の文字列リテラル用（改行は \n＝Enter、タブは \t＝Tab として打たれる）
+function cstr(s) { return s.replace(/\\/g, "\\\\").replace(/"/g, "\\\"").replace(/\n/g, "\\n").replace(/\t/g, "\\t"); }
+// マクロの手順1つ → C の1行
+function stepC(st) {
+  if (st.t === "text") {
+    const v = [...st.v].filter(c => /[\x20-\x7e\n\t]/.test(c)).join("");   // 打てない文字は入れない
+    return v ? `SEND_STRING("${cstr(v)}");` : "";
+  }
+  if (st.t === "key") return st.v ? `tap_code16(${st.v});` : "";
+  if (st.t === "down") return st.v ? `register_code16(${st.v});` : "";
+  if (st.t === "up") return st.v ? `unregister_code16(${st.v});` : "";
+  if (st.t === "wait") return `wait_ms(${Math.max(1, Math.min(60000, parseInt(st.v, 10) || 1))});`;
+  return "";
+}
+// マクロ1つ分の C の行（最後まで離していないキーは自動で離す）
+function macroC(x) {
+  const lines = x.steps.map(stepC).filter(Boolean);
+  const held = heldAtEnd(x);
+  if (held.length) {
+    lines.push("// 押したままのキーを離す");
+    held.slice().reverse().forEach(k => lines.push(`unregister_code16(${k});`));
+  }
+  return lines;
+}
+// マクロ1つ分を、Launcherの「コード入力」にそのまま貼り付けられる形式にする（parseLauncher の逆）
+// LCTL(LSFT(KC_T)) → ["KC_LCTL","KC_LSFT","KC_T"]（Launcherは LCTL(…) の形を知らないので、同時押しに直す）
+function splitMods(code) {
+  const MOD = { LCTL: "KC_LCTL", LSFT: "KC_LSFT", LALT: "KC_LALT", LGUI: "KC_LGUI" };
+  const out = []; let c = code;
+  for (;;) { const m = /^(LCTL|LSFT|LALT|LGUI)\((.*)\)$/.exec(c); if (!m) break; out.push(MOD[m[1]]); c = m[2]; }
+  out.push(c);
+  return out;
+}
+function launcherCode(x) {
+  const parts = x.steps.map(st => {
+    if (st.t === "text") return String(st.v || "");
+    if (!st.v && st.t !== "wait") return "";
+    const ks = st.t === "wait" ? [] : splitMods(st.v);
+    if (st.t === "key") return `{${ks.join(",")}}`;
+    if (st.t === "down") return ks.map(k => `{+${k}}`).join("");
+    if (st.t === "up") return ks.slice().reverse().map(k => `{-${k}}`).join("");
+    if (st.t === "wait") return `{${Math.max(1, Math.min(60000, parseInt(st.v, 10) || 1))}}`;
+    return "";
+  });
+  heldAtEnd(x).slice().reverse().forEach(k => parts.push(splitMods(k).reverse().map(c => `{-${c}}`).join("")));
+  return parts.join("");
+}
+// マウス・ホイールのキー（MS_…）をどこかで使っているか
+function usesMouse() {
+  const all = [...S.layers.flatMap(l => [...l.keys, ...l.enc]), ...S.macros.flatMap(x => x.steps.filter(s => KEY_STEPS.includes(s.t)).map(s => s.v))];
+  return all.some(c => /\bMS_/.test(String(c || "")));
+}
+// rules.mk の中身を決める（元の内容は残し、足りない行だけ足す）
+function rulesMk(cur) {
+  let t = cur == null ? "VIA_ENABLE = yes\n" : String(cur);
+  if (usesMouse() && !/^\s*MOUSEKEY_ENABLE\s*=\s*yes/m.test(t)) {
+    if (t && !t.endsWith("\n")) t += "\n";
+    t += "MOUSEKEY_ENABLE = yes   # マウス・ホイールのキーを使うため（keymap_maker が追加）\n";
+  }
+  return t;
+}
+// コード（Launcher形式）を書き換えたものを、そのマクロの手順に反映する
+function applyMacroCode(x, src) {
+  const r = parseLauncher(String(src || "").trim());
+  x.steps = r.steps;
+  return r;
+}
+// 開いているコード欄を、今の手順に合わせて書き直す（書き換え途中・入力中の欄はそのまま）
+function refreshCodeBoxes() {
+  S.macros.forEach(x => {
+    if (!macroCode.has(x)) return;
+    const ta = document.querySelector(`#codebox_${x.no} .codetext`);
+    if (!ta || ta.classList.contains("dirty") || ta === document.activeElement) return;
+    ta.value = launcherCode(x);
+  });
+}
+function generate() {
+  const colorName = l => { const p = PRESETS.find(([n, h, s]) => (s === 0 && l.sat === 0) || (s !== 0 && l.hue === h && l.sat === s)); return p ? p[0] : "カスタム"; };
+  const now = new Date();
+  const stamp = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+  const cfg = { layers: S.layers, macros: S.macros };
+  const X = S.macros;
+  const safeMemo = x => String(x.memo || "").replace(/[\\\r\n]/g, " ");
+  // M16 → QK_USER_0、M17 → QK_USER_0 + 1 …（番号ごとに固定なので、消しても他のマクロのコードは変わらない）
+  const textEnum = X.length ? `
+/* マクロ M16〜（M0〜M15 はLauncherのマクロ）。キーコードは QK_USER_0 から番号順に固定 */
+enum custom_keycodes {
+${X.map(x => `    MX_${x.no} = QK_USER_0 + ${x.no - MACRO_FIRST},${x.memo ? " // " + safeMemo(x) : ""}`).join("\n")}
+};
+` : "";
+  const o = [];
+  o.push(`/* Copyright 2024 ~ 2026 @ Keychron (https://www.keychron.com)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * ---------------------------------------------------------------
+ * Q0 Max  レイヤー色分け版（keymap_maker.html で作成 ${stamp}）
+ *   対象ソース：Keychron/qmk_firmware の 2025q3 ブランチ
+ *
+${S.layers.map((l, i) => ` *   レイヤー${i}：${colorName(l)}（色相 ${l.hue} / 彩度 ${l.sat}）`).join("\n")}
+ *
+ *   ・色は「今いちばん上で有効なレイヤー」で決まる。
+ *   ・明るさはLauncherの明るさ設定に従う。RGB Toggle で消している間は光らない。
+ *   ・このファイルは keymap_maker.html の「読み込む」で続きから編集できる。
+ *     下の KEYMAP_MAKER_CONFIG の行は消さないこと。
+ * ---------------------------------------------------------------
+ */
+// KEYMAP_MAKER_CONFIG: ${JSON.stringify(cfg)}
+
+#include QMK_KEYBOARD_H
+#include "keychron_common.h"
+#include "keymap_japanese.h"
+#include "sendstring_japanese.h" // パソコン側が日本語配列なので、@ などを日本語配列で打つ
+
+static const uint8_t layer_hue[4] = {${S.layers.map(l => l.hue).join(", ")}};
+static const uint8_t layer_sat[4] = {${S.layers.map(l => l.sat).join(", ")}};
+${textEnum}
+// clang-format off
+const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {`);
+  S.layers.forEach((l, li) => {
+    const lines = [];
+    let k = 0;
+    ROWS.forEach(n => {
+      const row = l.keys.slice(k, k + n).map(c => c === "KC_TRNS" ? "_______" : c);
+      k += n;
+      lines.push("        " + row.map(c => (c + ", ").padEnd(10)).join("").trimEnd());
+    });
+    lines[lines.length - 1] = lines[lines.length - 1].replace(/,$/, "");
+    o.push(`    [${li}] = LAYOUT_tenkey_27(\n${lines.join("\n")}\n    )${li < 3 ? "," : ""}`);
+  });
+  o.push(`};
+// clang-format on
+
+#if defined(ENCODER_MAP_ENABLE)
+const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][2] = {
+${S.layers.map((l, li) => `    [${li}] = {ENCODER_CCW_CW(${l.enc[0] === "KC_TRNS" ? "_______" : l.enc[0]}, ${l.enc[1] === "KC_TRNS" ? "_______" : l.enc[1]})},`).join("\n")}
+};
+#endif // ENCODER_MAP_ENABLE
+`);
+  o.push(`bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+${X.length ? `    switch (keycode) {
+${X.map(x => `        case MX_${x.no}:${x.memo ? " // " + safeMemo(x) : ""}
+            if (record->event.pressed) {
+${macroC(x).map(s => "                " + s).join("\n") || "                // （手順なし）"}
+            }
+            return false;`).join("\n")}
+    }
+
+` : ""}    /* Keychron の処理（Bluetooth切替など）は、このあと process_record_kb が自動で呼ぶ */
+    return true;
+}
+
+/* 毎フレーム、全キーを「今のレイヤーの色」で塗る。
+ * 本体に保存された照明設定は書き換えないので、
+ * 無線の状態表示などで設定が読み直されても色が崩れない。
+ * 無線の接続表示（点滅）は、このあと Keychron 側が上から描く。 */
+bool rgb_matrix_indicators_user(void) {
+    uint8_t layer = get_highest_layer(layer_state | default_layer_state);
+    if (layer > 3) {
+        layer = 3;
+    }
+
+    hsv_t hsv = {layer_hue[layer], layer_sat[layer], rgb_matrix_get_val()};
+    rgb_t rgb = hsv_to_rgb(hsv);
+
+    rgb_matrix_set_color_all(rgb.r, rgb.g, rgb.b);
+    return true;
+}
+`);
+  return o.join("\n");
+}
+
+/* ===== 読み込み ===== */
+// 設定（KEYMAP_MAKER_CONFIG の中身）を確かめて、古い形式・古いキー名を直したものを返す
+function migrateConfig(src) {
+  const c = JSON.parse(JSON.stringify(src));
+  if (!Array.isArray(c.layers) || c.layers.length !== 4 || c.layers.some(l => !Array.isArray(l.keys) || l.keys.length !== 27 || !Array.isArray(l.enc))) throw new Error("形式が違います");
+  let macros = Array.isArray(c.macros) ? c.macros : [];
+  // 古い形式からの引き継ぎ：文字列キー（TXT_n）→ M(15+n)、M5 固定の文字列 → M16（どのキーにも置かない）
+  if (!macros.length && Array.isArray(c.texts)) {
+    macros = c.texts.map(t => ({ no: MACRO_FIRST - 1 + t.id, memo: t.name || "", steps: [{ t: "text", v: t.text || "" }] }));
+    c.layers.forEach(l => {
+      const conv = k => { const m = /^TXT_(\d+)$/.exec(k); return m ? "MX_" + (MACRO_FIRST - 1 + +m[1]) : k; };
+      l.keys = l.keys.map(conv); l.enc = l.enc.map(conv);
+    });
+  }
+  if (!macros.length && c.m5) macros = [{ no: MACRO_FIRST, memo: "メール", steps: [{ t: "text", v: c.m5 }] }];
+  // 旧ソース（wireless_playground）のキー名 → 2025q3 のキー名
+  let renamed = 0;
+  const mig = k => typeof k !== "string" ? k : k.replace(/\b[A-Z][A-Z0-9_]*\b/g, t => LEGACY[t] ? (renamed++, LEGACY[t]) : t);
+  c.layers.forEach(l => { l.keys = l.keys.map(mig); l.enc = l.enc.map(mig); });
+  macros.forEach(x => { x.steps = Array.isArray(x.steps) ? x.steps : []; x.steps.forEach(st => { if (st.t === "key" || st.t === "down" || st.t === "up") st.v = mig(st.v); }); });
+  macros.sort((a, b) => a.no - b.no);
+  return { cfg: { layers: c.layers, macros }, renamed };
+}
+// 設定を画面に反映する
+function applyConfig(src, msg) {
+  const r = migrateConfig(src);
+  S = r.cfg;
+  cur = 0; sel = { type: "key", idx: 1 }; pick = null;
+  renderMacros(); render();
+  if (msg) flash(r.renamed ? `${msg}（古いキー名 ${r.renamed} か所を新しい名前に直しました）` : msg);
+  return r;
+}
+// keymap.c の中の設定（KEYMAP_MAKER_CONFIG）を取り出す。無ければ例外を投げる
+function parseKeymapC(text) {
+  const m = text.match(/^\/\/ KEYMAP_MAKER_CONFIG: (.*)$/m);
+  if (!m) throw new Error("KEYMAP_MAKER_CONFIG の行が見つかりません（このツールで作った keymap.c ではありません）");
+  return JSON.parse(m[1]);
+}
+function loadText(text, msg) {
+  try { applyConfig(parseKeymapC(text), msg || "読み込みました"); }
+  catch (e) { alert("読み込みに失敗しました：" + e.message); }
+}
+
+/* ===== 自動保存・名前を付けて保存（このパソコンのブラウザの中に保存） ===== */
+const AUTO_KEY = "q0max_autosave", SAVES_KEY = "q0max_saves";
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+};
+const snapshot = () => JSON.parse(JSON.stringify({ layers: S.layers, macros: S.macros }));
+const fmtTime = ms => { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+let autosaveOn = false;   // 起動して前回の内容を戻すまでは保存しない
+function autosave() {
+  if (!autosaveOn) return;
+  const ok = store.set(AUTO_KEY, { cfg: snapshot(), at: Date.now() });
+  const el = document.getElementById("autoInfo");
+  if (el) el.textContent = ok ? `自動保存：${fmtTime(Date.now())}` : "自動保存できませんでした（ブラウザの設定で保存が止められています）";
+}
+/* ===== 戻る・進む（割り当て・色・マクロの変更の履歴） ===== */
+const HIST_MAX = 200;
+let hist = [], hpos = -1, restoring = false, histEl = null, histAt = 0;
+function resetHistory() { hist = [JSON.stringify(snapshot())]; hpos = 0; histEl = null; updateUndoBtns(); }
+function recordHistory() {
+  if (!autosaveOn || restoring || hpos < 0) return;
+  const s = JSON.stringify(snapshot());
+  if (s === hist[hpos]) return;
+  // 同じ入力欄で続けて打っている・スライダーを動かしている間は、1回分にまとめる
+  const a = document.activeElement;
+  const typing = a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA");
+  const now = Date.now();
+  if (typing && a === histEl && now - histAt < 1500 && hpos > 0 && hpos === hist.length - 1) {
+    hist[hpos] = s;
+  } else {
+    hist = hist.slice(0, hpos + 1);   // 戻ったあとに変更したら、「進む」の分は捨てる
+    hist.push(s);
+    if (hist.length > HIST_MAX) hist.shift();
+    hpos = hist.length - 1;
+  }
+  histEl = typing ? a : null; histAt = now;
+  const um = document.getElementById("undoMsg"); if (um) um.textContent = "";   // 新しく変更したら、前の「戻しました」は消す
+  updateUndoBtns();
+}
+// 2つの状態の違いを探す（最初に見つかったキー／ノブ／色／マクロの変更）
+function diffState(a, b) {
+  for (let li = 0; li < Math.max(a.layers.length, b.layers.length); li++) {
+    const A = a.layers[li], B = b.layers[li];
+    if (!A || !B) return { what: "レイヤー" };
+    for (let i = 0; i < B.keys.length; i++) if (A.keys[i] !== B.keys[i]) return { li, type: "key", idx: i, from: A.keys[i], to: B.keys[i] };
+    for (let j = 0; j < B.enc.length; j++) if (A.enc[j] !== B.enc[j]) return { li, type: "enc", idx: j, from: A.enc[j], to: B.enc[j] };
+    if (A.hue !== B.hue || A.sat !== B.sat) return { li, type: "color" };
+  }
+  if (JSON.stringify(a.macros) !== JSON.stringify(b.macros)) return { type: "macro" };
+  return null;
+}
+function restoreHistory(pos) {
+  if (pos < 0 || pos >= hist.length) return null;
+  const before = JSON.parse(hist[hpos]);
+  hpos = pos;
+  const c = JSON.parse(hist[hpos]);
+  const d = diffState(before, c);
+  restoring = true;
+  try {
+    S.layers = c.layers; S.macros = c.macros;
+    if (cur >= S.layers.length) cur = 0;
+    // 変わったキーのレイヤー・キーを選んで見せる（何が戻ったか分かるように）
+    if (d && d.li != null) { cur = d.li; if (d.type === "key" || d.type === "enc") sel = { type: d.type, idx: d.idx }; }
+    pick = null; histEl = null;
+    macroOpen = new Set(); macroCode = new Set();   // 中身が入れ替わるので、開閉はいったん閉じた状態にする
+    renderMacros(); render();
+  } finally { restoring = false; }
+  updateUndoBtns();
+  const el = document.getElementById("undoMsg");
+  if (el && d) {
+    const where = d.type === "key" ? `レイヤー${d.li} ${POS_NAME[d.idx]}` : d.type === "enc" ? `レイヤー${d.li} ノブ${d.idx ? "右" : "左"}回し` : d.type === "color" ? `レイヤー${d.li} の色` : "マクロ";
+    el.textContent = d.from !== undefined ? `${where}：${label(d.from)} → ${label(d.to)}` : `${where}`;
+  }
+  return d;
+}
+const undo = () => { const d = restoreHistory(hpos - 1); const el = document.getElementById("undoMsg"); if (d && el) el.textContent = "戻しました　" + el.textContent; };
+const redo = () => { const d = restoreHistory(hpos + 1); const el = document.getElementById("undoMsg"); if (d && el) el.textContent = "進めました　" + el.textContent; };
+function updateUndoBtns() {
+  const nb = Math.max(0, hpos), nf = Math.max(0, hist.length - 1 - hpos);
+  document.querySelectorAll(".undo-btn").forEach(b => {
+    const back = b.dataset.undo === "-1";
+    b.disabled = back ? hpos <= 0 : hpos >= hist.length - 1;
+    b.title = back ? `ひとつ前に戻す（Ctrl+Z）　あと ${nb} 回戻せます` : `戻したのをやり直す（Ctrl+Y）　あと ${nf} 回進めます`;
+  });
+}
+
+const savesAll = () => store.get(SAVES_KEY) || {};
+function renderSaves(selName) {
+  const all = savesAll();
+  const names = Object.keys(all).sort((a, b) => all[b].at - all[a].at);
+  $("saveList").innerHTML = names.length
+    ? names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}（${fmtTime(all[n].at)}）</option>`).join("")
+    : `<option value="">（まだありません）</option>`;
+  if (selName && all[selName]) $("saveList").value = selName;
+  $("btnNamedOpen").disabled = $("btnNamedDel").disabled = !names.length;
+}
+
+/* ===== ボタン ===== */
+function flash(msg) { $("status").textContent = msg; clearTimeout(flash.t); flash.t = setTimeout(() => $("status").textContent = "", 4000); }
+
+/* ===== GitHub でビルド（自分の非公開リポジトリを開くだけ。トークンなどは使わない） ===== */
+function ghRepo() {
+  const v = ($("ghRepo").value || "").trim().replace(/^https?:\/\/github\.com\//i, "").replace(/\.git$/i, "").replace(/\/+$/, "");
+  return /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(v) ? v : null;
+}
+try { $("ghRepo").value = localStorage.getItem("q0max_gh_repo") || ""; } catch (e) {}
+$("ghRepo").oninput = () => { try { localStorage.setItem("q0max_gh_repo", $("ghRepo").value.trim()); } catch (e) {} };
+const ghOpen = path => {
+  const r = ghRepo();
+  if (!r) { $("ghMsg").textContent = "「自分の非公開リポジトリ」に「ユーザー名/リポジトリ名」を入れてください（例：yamada/q0max-mine）。"; $("ghRepo").focus(); return; }
+  window.open(`https://github.com/${r}/${path}`, "_blank", "noopener");
+};
+if (/^https?:$/.test(location.protocol || "") && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname || "")) {
+  $("flashBox").style.display = "none"; $("webNote").style.display = "";
+}
+$("btnGhSave").onclick =() => $("btnSave").onclick();
+$("btnGhUpload").onclick = () => ghOpen("upload/main/keymap");
+$("btnGhActions").onclick = () => ghOpen("actions");
+
+$("btnLayerLeft").onclick =() => moveLayerUI(cur, cur - 1);
+$("btnLayerRight").onclick = () => moveLayerUI(cur, cur + 1);
+$("hue").oninput = e => { S.layers[cur].hue = +e.target.value; render(); };
+$("sat").oninput = e => { S.layers[cur].sat = +e.target.value; render(); };
+$("btnTrns").onclick = () => setCode("KC_TRNS");
+$("btnDefault").onclick = () => {
+  const D = DEFAULT.layers[cur];
+  setCode(sel.type === "key" ? D.keys[sel.idx] : D.enc[sel.idx]);
+};
+$("rawBtn").onclick = () => {
+  const v = $("rawIn").value.trim();
+  if (!/^[A-Za-z0-9_()]+$/.test(v)) { alert("キーコードは半角英数字・_・( ) だけで入力してください。"); return; }
+  setCode(v); $("rawIn").value = "";
+};
+$("rawIn").onkeydown = e => { if (e.key === "Enter") $("rawBtn").click(); };
+$("btnAddMacro").onclick = () => {
+  const x = newMacro();
+  renderMacros(); render(); focusMacro(x.no);
+};
+$("btnOpenAll").onclick = () => { S.macros.forEach(x => macroOpen.add(x)); renderMacros(); };
+$("btnCloseAll").onclick = () => { macroOpen.clear(); macroCode.clear(); renderMacros(); };
+// Launcher のマクロのコードから作る
+$("btnImp").onclick = () => {
+  const src = $("impText").value.trim();
+  if (!src) { $("impMsg").textContent = "コードを貼り付けてください。"; return; }
+  const r = parseLauncher(src);
+  if (!r.steps.length) { $("impMsg").textContent = "手順が見つかりませんでした。"; return; }
+  const x = newMacro($("impMemo").value.trim(), r.steps);
+  $("impText").value = ""; $("impMemo").value = "";
+  $("impMsg").textContent = `M${x.no} を作りました（手順 ${r.steps.length} 個）。` +
+    (r.unknown.length ? `このツールが知らないキー名：${r.unknown.join("、")}（ビルドで失敗したら見直してください）。` : "") +
+    "キーに置くには、上の「選んだキーの割り当て」→「マクロ（M16〜）」から選んでください。";
+  renderMacros(); render(); focusMacro(x.no);
+};
+
+/* ===== ビルドと書き込み ===== */
+const HOME_DEFAULT = "C:/qmk_keychron_2025q3";
+const KB = "keychron/q0_max/encoder", KM = "layer_color";
+function loadHome() { try { return localStorage.getItem("q0max_qmk_home") || HOME_DEFAULT; } catch (e) { return HOME_DEFAULT; } }
+function updateBuild() {
+  const home = ($("qmkHome").value.trim() || HOME_DEFAULT).replace(/\\/g, "/").replace(/\/+$/, "");
+  try { localStorage.setItem("q0max_qmk_home", home); } catch (e) {}
+  $("savePath").textContent = home.replace(/\//g, "\\") + `\\keyboards\\${KB.replace(/\//g, "\\")}\\keymaps\\${KM}`;
+  $("cmdCompile").textContent = `cd ${home}\nqmk compile -kb ${KB} -km ${KM}`;
+  $("cmdFlash").textContent = `qmk flash -kb ${KB} -km ${KM}`;
+}
+$("qmkHome").value = loadHome();
+$("qmkHome").oninput = updateBuild;
+async function copyText(btn, text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }
+  const old = btn.textContent; btn.textContent = "コピーしました"; setTimeout(() => btn.textContent = old, 1500);
+}
+document.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => copyText(b, $(b.dataset.copy).textContent));
+updateBuild();
+$("btnPickCancel").onclick = () => { pick = null; render(); };
+
+$("btnSave").onclick = async () => {
+  const text = generate();
+  if (window.showSaveFilePicker) {
+    try {
+      const h = await showSaveFilePicker({ suggestedName: "keymap.c", types: [{ description: "C ソース", accept: { "text/plain": [".c"] } }] });
+      const w = await h.createWritable(); await w.write(text); await w.close();
+      flash("保存しました"); return;
+    } catch (e) { if (e.name === "AbortError") return; }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+  a.download = "keymap.c"; a.click();
+  flash("ダウンロードフォルダに保存しました");
+};
+$("btnCopy").onclick = async () => {
+  const text = generate();
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select();
+    document.execCommand("copy"); t.remove();
+  }
+  flash("コピーしました");
+};
+$("btnLoad").onclick = () => $("fileIn").click();
+$("fileIn").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(loadText); e.target.value = "";
+};
+$("btnReset").onclick = () => {
+  if (!confirm("全部最初の割り当て・色に戻します。よろしいですか？\n（名前を付けて保存したものは消えません）")) return;
+  S = JSON.parse(JSON.stringify(DEFAULT)); cur = 0; sel = { type: "key", idx: 1 }; pick = null; renderMacros(); render();
+};
+
+// 名前を付けて保存・開く・削除
+$("btnNamedSave").onclick = () => {
+  const name = $("saveName").value.trim();
+  if (!name) { alert("保存する名前を入れてください（例：普段用、ズーム用）。"); $("saveName").focus(); return; }
+  const all = savesAll();
+  if (all[name] && !confirm(`「${name}」はもうあります。上書きしますか？`)) return;
+  all[name] = { cfg: snapshot(), at: Date.now() };
+  if (!store.set(SAVES_KEY, all)) { alert("保存できませんでした（ブラウザの設定で保存が止められています）。「keymap.c を保存」でファイルに保存してください。"); return; }
+  $("saveName").value = "";
+  renderSaves(name); flash(`「${name}」として保存しました`);
+};
+$("btnNamedOpen").onclick = () => {
+  const name = $("saveList").value, it = savesAll()[name];
+  if (!it) return;
+  if (!confirm(`「${name}」を開きます。\n今の画面の内容は、名前を付けて保存していなければ上書きされます。よろしいですか？`)) return;
+  try { applyConfig(it.cfg, `「${name}」を開きました`); } catch (e) { alert("開けませんでした：" + e.message); }
+};
+$("btnNamedDel").onclick = () => {
+  const name = $("saveList").value, all = savesAll();
+  if (!all[name] || !confirm(`「${name}」を削除します。よろしいですか？`)) return;
+  delete all[name]; store.set(SAVES_KEY, all); renderSaves(); flash(`「${name}」を削除しました`);
+};
+
+/* ===== QMKのフォルダに直接保存（選んだフォルダはブラウザが覚える） ===== */
+const IDB = {
+  open() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open("q0max_maker", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("kv");
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+  },
+  async get(k) { const db = await this.open(); return new Promise((res, rej) => { const q = db.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); },
+  async set(k, v) { const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction("kv", "readwrite"); t.objectStore("kv").put(v, k); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); },
+};
+function showDir(h, note) {
+  const el = $("dirInfo");
+  el.className = "dirinfo" + (h ? " ok" : "");
+  el.textContent = h ? `保存先：keymaps\\${h.name}${note ? "　" + note : ""}` : "保存先：まだ選んでいません";
+}
+async function initDir() {
+  if (!window.showDirectoryPicker) {
+    showDir(null);
+    $("dirInfo").textContent = "このブラウザはフォルダへの直接保存に対応していません（Chrome か Edge で開いてください）";
+    return;
+  }
+  try { const h = await IDB.get("dir"); if (h) showDir(h, "（前回選んだフォルダ）"); } catch (e) {}
+}
+async function pickDir() {
+  if (!window.showDirectoryPicker) { alert("このブラウザはフォルダへの直接保存に対応していません。Chrome か Edge で開いてください。"); return null; }
+  let h;
+  try { h = await showDirectoryPicker({ id: "q0max_layer_color", mode: "readwrite" }); } catch (e) { return null; }
+  // keymaps を選んだときは、その中の layer_color を使う（無ければ作る）
+  if (h.name !== KM) {
+    let sub = null;
+    try { sub = await h.getDirectoryHandle(KM); } catch (e) {}
+    if (!sub) {
+      if (h.name !== "keymaps" && !confirm(`選んだフォルダ「${h.name}」は ${KM} でも keymaps でもありません。\nこの中に ${KM} フォルダを作って保存しますか？\n\n（ふつうは ${$("savePath").textContent} を選びます）`)) return null;
+      sub = await h.getDirectoryHandle(KM, { create: true });
+    }
+    h = sub;
+  }
+  try { await IDB.set("dir", h); } catch (e) {}
+  showDir(h);
+  return h;
+}
+async function getDir() {
+  let h = null;
+  try { h = await IDB.get("dir"); } catch (e) {}
+  if (!h) return pickDir();
+  const opt = { mode: "readwrite" };
+  try {
+    if ((await h.queryPermission(opt)) !== "granted" && (await h.requestPermission(opt)) !== "granted") { flash("フォルダへの保存が許可されませんでした"); return null; }
+  } catch (e) { return pickDir(); }
+  return h;
+}
+async function writeFile(dir, name, text) {
+  const f = await dir.getFileHandle(name, { create: true });
+  const w = await f.createWritable(); await w.write(text); await w.close();
+}
+async function readFile(dir, name) {
+  const f = await dir.getFileHandle(name);
+  return await (await f.getFile()).text();
+}
+// QMKのフォルダの keymap.c を読み込む。silent: true のときは、フォルダの許可を
+// 聞き直さず（聞き直しにはボタンを押すなどの操作が必要）、すでに許可済みのときだけ読む
+async function loadFromDir(silent) {
+  if (!window.showDirectoryPicker) return false;
+  let dir;
+  if (silent) {
+    try { dir = await IDB.get("dir"); } catch (e) { return false; }
+    if (!dir) return false;
+    try { if ((await dir.queryPermission({ mode: "read" })) !== "granted") return false; } catch (e) { return false; }
+  } else {
+    dir = await getDir();
+    if (!dir) return false;
+  }
+  let text;
+  try { text = await readFile(dir, "keymap.c"); }
+  catch (e) { if (!silent) alert(`keymap.c が見つかりませんでした（${dir.name} フォルダ）：` + e.message); return false; }
+  try {
+    applyConfig(parseKeymapC(text), `keymaps\\${dir.name}\\keymap.c を読み込みました`);
+    showDir(dir, "（読み込み済み）");
+    return true;
+  } catch (e) { if (!silent) alert("読み込みに失敗しました：" + e.message); return false; }
+}
+async function saveToDir() {
+  const dir = await getDir();
+  if (!dir) return false;
+  try {
+    await writeFile(dir, "keymap.c", generate());
+    let rules = null;
+    try { rules = await readFile(dir, "rules.mk"); } catch (e) { rules = null; }
+    const want = rulesMk(rules);
+    if (want !== rules) await writeFile(dir, "rules.mk", want);
+    showDir(dir, `（${fmtTime(Date.now())} に保存）`);
+    flash(`keymaps\\${dir.name}\\keymap.c に保存しました`);
+    return true;
+  } catch (e) { alert("保存できませんでした：" + e.message + "\n「保存先フォルダを選び直す」でもう一度選んでください。"); return false; }
+}
+$("btnDirSave").onclick = () => saveToDir();
+$("btnDirLoad").onclick = () => loadFromDir(false);
+$("btnDirPick").onclick = async () => { if (await pickDir()) saveToDir(); };
+
+// 保存して焼く：q0max_flash.bat を「q0maxflash:」で起動する（q0max_ボタン登録.bat で登録しておく）
+$("btnFlash").onclick = async () => {
+  const w = checks();
+  if (w.length && !confirm("「チェック」に注意が出ています：\n・" + w.slice(0, 5).join("\n・") + "\n\nこのまま焼きますか？")) return;
+  if (!(await saveToDir())) return;
+  location.href = "q0maxflash:go";
+  $("flashMsg").innerHTML = `keymap.c を保存しました。書き込み用の黒い画面が開きます（ブラウザに「q0maxflash を開きますか」と聞かれたら「開く」）。<br>
+    <b>黒い画面が開かないとき</b>：まだ登録していなければ <b>q0max_ボタン登録.bat</b> を1回ダブルクリックしてから、もう一度押してください。または <b>q0max_flash.bat</b> をダブルクリックしても同じです。`;
+};
+
+/* ===== 起動：まず QMK のフォルダの keymap.c（本物）を読む。無ければ前回の続きから ===== */
+(async () => {
+  let loaded = false;
+  try { loaded = await loadFromDir(true); } catch (e) {}
+  if (!loaded) {
+    const a = store.get(AUTO_KEY);
+    if (a && a.cfg) {
+      try { applyConfig(a.cfg, `前回の続きから開きました（${fmtTime(a.at)} の自動保存）`); }
+      catch (e) { renderMacros(); render(); }
+    } else { renderMacros(); render(); }
+    await initDir();   // 保存先フォルダの表示だけ更新（まだ読める状態ではなかったとき）
+  }
+  autosaveOn = true; autosave();
+  resetHistory();   // 開いた時点を「戻る」の出発点にする
+  renderSaves();
+})();
+
+document.querySelectorAll(".undo-btn").forEach(b => b.onclick = () => (b.dataset.undo === "-1" ? undo() : redo()));
+// Ctrl+Z / Ctrl+Y（Ctrl+Shift+Z）。文字を入力中は、その欄の普通の「元に戻す」を優先する
+document.addEventListener("keydown", e => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const a = document.activeElement;
+  if (a && (a.tagName === "TEXTAREA" || (a.tagName === "INPUT" && a.type !== "range" && a.type !== "checkbox"))) return;
+  const k = e.key.toLowerCase();
+  if (k === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+  else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); redo(); }
+});
+</script>
+</body>
+</html>
