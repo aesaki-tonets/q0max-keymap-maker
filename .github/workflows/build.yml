@@ -1,0 +1,83 @@
+# Q0 Max（layer_color）のファームを GitHub 上でビルドする
+#
+# ・自分用の「非公開（Private）」のコピーで使う仕組みです。
+#   keymap/keymap.c をアップロード（push）すると自動で動き、
+#   できた .bin を Actions の画面の「Artifacts」からダウンロードできる。
+# ・公開（Public）のリポジトリではビルドしない。
+#   公開リポジトリの Artifacts は誰でもダウンロードできるため、
+#   keymap.c に入れたメールアドレスなどが漏れるのを防ぐ。
+# ・keymap/keymap.c が無いとき（配布用のひな形のまま）は何もしない。
+name: Q0 Max ファームをビルド
+
+on:
+  push:
+    paths:
+      - "keymap/**"
+  workflow_dispatch:   # Actions の画面から手動でも動かせる
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.c.outputs.go }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: c
+        name: ビルドしてよいか確かめる
+        env:
+          IS_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          if [ ! -f keymap/keymap.c ]; then
+            echo "keymap/keymap.c がありません（ひな形のまま）。ビルドしません。" >> "$GITHUB_STEP_SUMMARY"
+            echo "go=no" >> "$GITHUB_OUTPUT"
+          elif [ "$IS_PRIVATE" != "true" ]; then
+            echo "::error::このリポジトリは公開（Public）です。keymap.c の内容とファームが誰でも見られてしまうので、ビルドしません。Settings → General → Danger Zone → Change visibility で Private にするか、Use this template で Private のコピーを作ってください。"
+            echo "go=no" >> "$GITHUB_OUTPUT"
+            exit 1
+          else
+            echo "go=yes" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.go == 'yes'
+    runs-on: ubuntu-latest
+    container: ghcr.io/qmk/qmk_cli
+    env:
+      QMK_HOME: ${{ github.workspace }}/qmk_firmware
+      KB: keychron/q0_max/encoder
+      KM: layer_color
+    steps:
+      - name: このリポジトリ（keymap）を取得
+        uses: actions/checkout@v4
+        with:
+          path: mine
+
+      - name: Keychron のソース（2025q3）を取得
+        run: |
+          git config --global --add safe.directory '*'
+          git clone --depth 1 --branch 2025q3 --recurse-submodules --shallow-submodules \
+            https://github.com/Keychron/qmk_firmware.git "$QMK_HOME"
+
+      - name: keymap を入れる
+        run: |
+          D="$QMK_HOME/keyboards/$KB/keymaps/$KM"
+          mkdir -p "$D"
+          cp mine/keymap/keymap.c "$D/"
+          if [ -f mine/keymap/rules.mk ]; then cp mine/keymap/rules.mk "$D/"; else printf 'VIA_ENABLE = yes\n' > "$D/rules.mk"; fi
+          # マウス・ホイールのキーを使っていれば、マウスキーを有効にする（keymap_maker と同じ扱い）
+          if grep -q 'MS_' "$D/keymap.c" && ! grep -q '^MOUSEKEY_ENABLE *= *yes' "$D/rules.mk"; then
+            printf '\nMOUSEKEY_ENABLE = yes\n' >> "$D/rules.mk"
+          fi
+
+      - name: ビルド
+        working-directory: ${{ env.QMK_HOME }}
+        run: qmk compile -kb "$KB" -km "$KM"
+
+      - name: できたファームを保存
+        uses: actions/upload-artifact@v4
+        with:
+          name: q0max_layer_color_firmware
+          path: ${{ env.QMK_HOME }}/*.bin
+          if-no-files-found: error
+          retention-days: 7
